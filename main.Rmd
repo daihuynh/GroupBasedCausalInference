@@ -7,26 +7,34 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-Sys.setenv(JAVA_HOME='/Users/daihuynh/Downloads/OpenJDK8U-jdk_x64_mac_hotspot_8u242b08/jre')
+Sys.setenv(JAVA_HOME='E:/Program Files (x86)/Java/bin')
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
-# If there is any error while importing grouping_using_module_network.R, 
-# please ignore it since it is just an error of Rstudio.
-# Solution is to update Rstudio to 1.2.5036-1 or newer.
 source("./Scripts/require_packages.R")
-source("./Scripts/grouping_using_module_network.R")
-source("./Scripts/conditional_independence_group_test.R")
-source("./Scripts/learn_group_skeleton_pc.R")
+
 require.packages(c(
+  "rJava", "jdx",
+  "foreach", "doParallel",
   "dplyr", "magrittr",
+  "BiocManager"
+))
+
+require.bio_packages(c(
   "CancerSubtypes",
   "miRBaseConverter", "miRLAB",
   "pcalg", "Rgraphviz"
 ))
+
+# If there is any error while importing grouping_using_module_network.R, 
+# please ignore it since it is just an error of Rstudio.
+# Solution is to update Rstudio to 1.2.5036-1 or newer.
+source("./Scripts/grouping_using_module_network.R")
+source("./Scripts/conditional_independence_group_test.R")
+source("./Scripts/learn_group_skeleton_pc.R")
 ```
 
 # Step 1: Data Preparation
@@ -170,7 +178,7 @@ convert_to_col_numbers(mes_groups, cancer_dm)
 ```
 
 # Step 3: Learning group DAG
-```{r}
+```{r include=F}
 
 # ==== 3.1 Learn the variable DAG
 pdag <- pc(list(C = cor(cancer_dm), 
@@ -186,7 +194,12 @@ group1 <- convert_to_col_numbers(miRNAs_groups, cancer_dm)
 group2 <- convert_to_col_numbers(epi_groups, cancer_dm)
 group3 <- convert_to_col_numbers(mes_groups, cancer_dm)
 
-test <- dag2essgraph(pdag@graph)
+# foreach
+split <- detectCores()
+eachStart <- 25
+iters = iter(rep(eachStart, split - 1))
+cl <- makeCluster(split)
+registerDoParallel(cl)
 
 # ==== 3.1 Learn the group DAG skeleton
 source('./Scripts/learn_group_skeleton_pc.R')
@@ -197,12 +210,14 @@ groups <- c(
     convert_to_col_numbers(mes_groups, cancer_dm)
   )
 groupDAG <- learn_skeleton_group_pc(
-  dag = learned_dag@graph,
+  dag = learned_dag,
   groups =  groups,
   ratio = 0.90,
   p = length(groups),
   verbose = T
 )
+
+plot(groupDAG)
 ```
 
 
