@@ -34,17 +34,23 @@ conditional_independence_group_test <- function(dag, groups, setA, setB, setC, r
   flag1 <- array(FALSE, dim = lengthA)
   flag2 <- array(FALSE, dim = lengthB)
   for (i in 1:lengthA) {
-    flags <- foreach (j=1:lengthB, .combine='c', .packages="pcalg") %dopar% {
+    flag <- foreach (j=1:lengthB, .combine='c', .packages="pcalg") %dopar% {
       return(!dsep(groupA[i], groupB[j], cond_set, dag))
     }
-    if (sum(flags == T) >= round(limiteA) &&
-        sum(flags == T) >= round(limiteB)) {
+    
+    if (any(flag == T)) {
+      flag1[i] <- T
+    }
+    for (j in 1:length(flag)) {
+      if (flag[j]) {
+        flag2[j] <- T
+      }
+    }
+    
+    if (sum(flag1 == T) >= round(limiteA) &&
+        sum(flag2 == T) >= round(limiteB)) {
       return(F)
     }
-    # if (sum(flag1 == TRUE) >= round(limiteA) &&
-    #     sum(flag2 == TRUE) >= round(limiteB)) {
-    #   return(FALSE)
-    # }
   }
   return(T)
 }
