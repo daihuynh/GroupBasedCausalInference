@@ -187,12 +187,10 @@ pdag <- pc(list(C = cor(cancer_dm),
            alpha = 0.05,
            p = ncol(cancer_dm))
 
+# pdag <- readRDS('./Results/variable_dag.rds')
+
 learned_dag <- pdag2dag(pdag@graph)
 learned_dag <- as(learned_dag$graph, "graphNEL")
-
-group1 <- convert_to_col_numbers(miRNAs_groups, cancer_dm)
-group2 <- convert_to_col_numbers(epi_groups, cancer_dm)
-group3 <- convert_to_col_numbers(mes_groups, cancer_dm)
 
 # foreach
 split <- detectCores()
@@ -202,8 +200,8 @@ cl <- makeCluster(split)
 registerDoParallel(cl)
 
 # ==== 3.1 Learn the group DAG skeleton
-source('./Scripts/learn_group_skeleton_pc.R')
-source('./Scripts/conditional_independence_group_test.R')
+# source('./Scripts/learn_group_skeleton_pc.R')
+# source('./Scripts/conditional_independence_group_test.R')
 groups <- c(
     convert_to_col_numbers(miRNAs_groups, cancer_dm),
     convert_to_col_numbers(epi_groups, cancer_dm),
@@ -216,6 +214,9 @@ groupDAG <- learn_skeleton_group_pc(
   p = length(groups),
   verbose = T
 )
+
+# groupDAG <- readRDS('./Results/group_dag.rds')
+# saveRDS(groupDAG, './Results/group_dag1.rds')
 
 plot(groupDAG)
 ```
