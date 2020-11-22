@@ -7,7 +7,7 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-Sys.setenv(JAVA_HOME='E:/Program Files (x86)/Java/bin')
+Sys.setenv(JAVA_HOME='E:/Program Files/Java/jre1.8.0_271/bin')
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -17,6 +17,7 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 source("./Scripts/require_packages.R")
 
 require.packages(c(
+  "ini",
   "rJava", "jdx",
   "foreach", "doParallel",
   "dplyr", "magrittr",
@@ -39,30 +40,15 @@ source("./Scripts/learn_group_skeleton_pc.R")
 
 # Step 1: Data Preparation
 ```{r}
-load(paste("./Data/BRCA_matchedData.RData", sep=""))
-load(paste("./Data/BRCA_matchedData_normal_samples.RData", sep=""))
+# Read config file
+config <- read.ini('./Configs/cancer.ini')
 
-# miRNameList = colnames(matchedData$miRs)
-# 
-# version=checkMiRNAVersion(miRNameList,verbose=FALSE)
-# # Convert non mature miRNAs' names to mature names
-# miRMature=miRNA_PrecursorToMature(miRNameList, version=version)
-# # Convert to version 21
-# miRNameList_Accession = miRNA_NameToAccession(miRMature[, 2], version=version)
-# miRNameList_Converted = miRNA_AccessionToName(miRNameList_Accession[, 2], targetVersion = "v21")
-# 
-# miRNameList <- miRNameList_Converted[,2]
-# naList <- which(is.na(miRNameList_Converted[,2]))
-# for(i in 1:length(naList)) {
-#   k <- naList[i]
-#   miRNameList[k] <- miRMature[k,2]
-# }
-# 
-# miRNAVersionConvert(miRNANames = miRName)
-# 
-# colnames(matchedData$miRs) <- miRNameList
+# Load the normal genes dataset and the anomaly genes dataset
+load(paste(config$data$anomaly, sep=""))
+load(paste(config$data$normal, sep=""))
 
-scan_df <- read.csv("./Data/TargetScan_v21.csv")
+# Load scan data
+scan_df <- read.csv(config$data$scan)
 
 # ==== 1.1 Process cancer data =====
 cancer.miRNAs <- matchedData$miRs
@@ -125,19 +111,23 @@ normal.miRNAs <- normal.miRNAs[, colnames(normal.miRNAs) %in% unique(scan_df$miR
 # Need to transpose data matrix since the function requires matrices having:
 #   - rows: genomic features (gene names)
 #   - columns: cancer samples (observations)
-# diffexp_result <- DiffExp.limma(Tumor_Data = t(cancer.miRNAs), 
-#                                  Normal_Data = t(normal.miRNAs), 
-#                                  topk = 30)
-# top30_miRNAs <- diffexp_result$`Subtype 1`$ID
 result <- FSbyMAD(t(cancer.miRNAs),
                   cut.type = 'topk',
                   value = 30)
 top30_miRNAs <- rownames(result)
 
+# Save to file
+write.csv(as.data.frame(top30_miRNAs), 
+          file=config$output$top30miRNAs, 
+          col.names = F,
+          row.names = F)
+
 
 # ==== 1.4 EMT =====
-emt_df <- cbind(read.table("./Data/EMT.txt",stringsAsFactors=FALSE, header = FALSE),
-                read.table("./Data/EMT_type.txt",stringsAsFactors=FALSE, header = FALSE))
+# The reason why I read from .txt files instead of CSV or EXCEL file is because
+# some gene names are automatically converted into datetime by Microsoft Excel
+emt_df <- cbind(read.table(config$data$emtnames,stringsAsFactors=FALSE, header = FALSE),
+                read.table(config$data$emttypes,stringsAsFactors=FALSE, header = FALSE))
 colnames(emt_df) <- c("mRNAs", "Type")
 
 # Only select mRNAs that exist in cancer dataset
@@ -172,9 +162,10 @@ mes_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/modul
                               numModules = 6,
                               numIterations = 30)
 
-convert_to_col_numbers(miRNAs_groups, cancer_dm)
-convert_to_col_numbers(epi_groups, cancer_dm)
-convert_to_col_numbers(mes_groups, cancer_dm)
+# Save results
+save(miRNAs_groups, file=config$output$miRNAgroups)
+save(epi_groups, file=config$output$epigroups)
+save(mes_groups, file=config$output$mesgroups)
 ```
 
 # Step 3: Learning group DAG
@@ -193,10 +184,8 @@ learned_dag <- pdag2dag(pdag@graph)
 learned_dag <- as(learned_dag$graph, "graphNEL")
 
 # foreach
-split <- detectCores()
-eachStart <- 25
-iters = iter(rep(eachStart, split - 1))
-cl <- makeCluster(split)
+nCores <- detectCores()
+cl <- makeCluster(nCores - 1)
 registerDoParallel(cl)
 
 # ==== 3.1 Learn the group DAG skeleton
@@ -216,12 +205,10 @@ groupDAG <- learn_skeleton_group_pc(
 )
 
 # groupDAG <- readRDS('./Results/group_dag.rds')
-# saveRDS(groupDAG, './Results/group_dag1.rds')
+# saveRDS(groupDAG, './Results/group_dag.rds')
 
 plot(groupDAG)
 ```
-
-
 
 
 
