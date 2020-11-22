@@ -1,0 +1,52 @@
+---
+title: "visualization"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+library(Rgraphviz)
+library(ini)
+
+# Read config file
+config <- read.ini('./Configs/cancer.ini')
+
+load(file=config$output$miRNAgroups)
+load(file=config$output$epigroups)
+load(file=config$output$mesgroups)
+groupDAG <- readRDS('./Results/group_dag.rds')
+
+nAttrs <- list(
+  fillcolor = c(
+    '1' = 'red',
+    '2' = 'red',
+    '3' = 'red',
+    '4' = 'red',
+    '5' = 'red',
+    '6' = 'green',
+    '7' = 'green',
+    '8' = 'green',
+    '9' = 'green',
+    '10' = 'blue',
+    '11' = 'blue',
+    '12' = 'blue',
+    '13' = 'blue',
+    '14' = 'blue',
+    '15' = 'blue'
+  )
+)
+
+plot(groupDAG@graph, attrs=list(
+  edge=list(color='black')
+), nodeAttrs=nAttrs)
+```
+
+```{r}
+miRNAs_groups[[5]]
+mes_groups[[6]]
+```
