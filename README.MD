@@ -7,7 +7,7 @@ This is the specification of the computer which built run the experiment
 ## Time for building DAGs
 
 1. The variable dag: 15 minutes. It used a single thread.
-2. The group dag: around 8 hours. It used 11 threads, and 10GBs RAM.
+2. The group dag: around 3.5 hours. It used 8 threads, and 10GBs RAM.
 
 ## Prerequisites
 
