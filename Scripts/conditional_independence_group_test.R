@@ -8,42 +8,60 @@
 #'@param ratio ratio for delta-d-separation
 #'@return TRUE if group A and group B conditional independent given group C, FALSE for otherwise
 conditional_independence_group_test <- function(dag, groups, setA, setB, setC, ratio) {
-  if (length(setC) == 0)
-    cond_set = c()
-  else{
-    cond_set = c()
+  cond_set = c()
+  if (length(setC) > 0) {
     for (i in 1:length(setC))
       cond_set = c(cond_set, groups[[setC[i]]])
   }
   groupA <- groups[[setA]]
   groupB <- groups[[setB]]
-  print(groupA)
-  print(groupB)
-  print(setC)
-  print(cond_set)
   lengthA <- length(groupA)
   lengthB <- length(groupB)
-  limiteA <- ratio * lengthA
-  limiteB <- ratio * lengthB
-  if (limiteA < 1) {
-    limiteA = 1
+  limA <- round(ratio * lengthA)
+  limB <- round(ratio * lengthB)
+  
+  if (limA < 1) {
+    limA = 1
   }
-  if (limiteB < 1) {
-    limiteB = 1
+  if (limB < 1) {
+    limB = 1
   }
-  flag1 <- array(FALSE, dim = lengthA)
-  flag2 <- array(FALSE, dim = lengthB)
-  for (i in 1:lengthA) {
-    for (j in 1:lengthB) {
-      if (!dsep(groupA[i], groupB[j], cond_set, dag)) {
-        flag1[i] = TRUE
-        flag2[j] = TRUE
-      }
+  
+  result <- foreach(i = 1:lengthA, .combine='cbind') %:%
+    foreach(j = 1:lengthB, .combine='c', .packages='pcalg') %dopar% {
+      ifelse(dsep(groupA[i], groupB[j], cond_set, dag), 0, 1)
     }
-    if (sum(flag1 == TRUE) >= round(limiteA) &&
-        sum(flag2 == TRUE) >= round(limiteB)) {
-      return(FALSE)
-    }
+  
+  # d-connected if
+  # If A(active) >= A(total * ratio) &&
+  #    B(active) >= B(active * ratio)
+  if (sum(colSums(result) > 0) < limA ||
+      sum(rowSums(result) > 0) < limB) {
+    return(T)
   }
-  return(TRUE)
+  
+  # flag1 <- array(FALSE, dim = lengthA)
+  # flag2 <- array(FALSE, dim = lengthB)
+  
+  # for (i in 1:lengthA) {
+  #   for (j in 1:lengthB) {
+  #     if (!dsep(groupA[i], groupB[j], cond_set, dag)) {
+  #       return(F)
+  #     }
+  #   }
+    # flag2 <- foreach (j = 1:lengthB,
+    #                   .combine = 'c',
+    #                   .packages = "pcalg") %dopar% {
+    #                     return(!dsep(groupA[i], groupB[j], cond_set, dag))
+    #                   }
+    # 
+    # if (sum(flag2 == T) >= round(limiteB)) {
+    #   flag1[i] <- T 
+    # }
+    # 
+    # if (sum(flag1 == T) >= round(limiteA)) {
+    #   return(F)
+    # }
+  # }
+  return(F)
 }

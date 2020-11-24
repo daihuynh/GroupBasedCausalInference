@@ -105,8 +105,6 @@ learn_skeleton_group_pc <- function(dag,
           repeat {
             ## condition w.r.to all  nbrs[S] of size 'ord'
             n.edgetests[ord1] <- n.edgetests[ord1] + 1
-            print(nbrs)
-            print(S)
             group_CI <- conditional_independence_group_test(dag, groups, x, y, nbrs[S], ratio)
             if (verbose)
               cat("x=", x, " y=", y, " S=", nbrs[S], ": pval =", group_CI, "\n")
