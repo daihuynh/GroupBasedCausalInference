@@ -14,39 +14,83 @@ library(Rgraphviz)
 library(ini)
 
 # Read config file
-config <- read.ini('./Configs/cancer.ini')
+config <- read.ini('./Configs/breast_cancer_top30miRNAs.ini')
 
 load(file=config$output$miRNAgroups)
 load(file=config$output$epigroups)
 load(file=config$output$mesgroups)
-groupDAG <- readRDS('./Results/group_dag.rds')
+groupDAG <- readRDS(config$output$group_dag)
 
 nAttrs <- list(
   fillcolor = c(
-    '1' = 'red',
-    '2' = 'red',
-    '3' = 'red',
-    '4' = 'red',
-    '5' = 'red',
-    '6' = 'green',
-    '7' = 'green',
-    '8' = 'green',
-    '9' = 'green',
-    '10' = 'blue',
-    '11' = 'blue',
-    '12' = 'blue',
-    '13' = 'blue',
-    '14' = 'blue',
-    '15' = 'blue'
+    '1' = '#e17055',
+    '2' = '#e17055',
+    '3' = '#e17055',
+    '4' = '#e17055',
+    '5' = '#e17055',
+    '6' = '#00cec9',
+    '7' = '#00cec9',
+    '8' = '#00cec9',
+    '9' = '#00cec9',
+    '10' = '#00cec9',
+    '11' = '#0984e3',
+    '12' = '#0984e3',
+    '13' = '#0984e3',
+    '14' = '#0984e3',
+    '15' = '#0984e3'
+  ),
+  color = c(
+    '1' = 'white',
+    '2' = 'white',
+    '3' = 'white',
+    '4' = 'white',
+    '5' = 'white',
+    '6' = 'white',
+    '7' = 'white',
+    '8' = 'white',
+    '9' = 'white',
+    '10' = 'white',
+    '11' = 'white',
+    '12' = 'white',
+    '13' = 'white',
+    '14' = 'white',
+    '15' = 'white'
+  ),
+  fontcolor =  c(
+    '1' = '',
+    '2' = '#2d3436',
+    '3' = '#2d3436',
+    '4' = '#2d3436',
+    '5' = '#2d3436',
+    '6' = '#2d3436',
+    '7' = '#2d3436',
+    '8' = '#2d3436',
+    '9' = '#2d3436',
+    '10' = '#2d3436',
+    '11' = '#2d3436',
+    '12' = '#2d3436',
+    '13' = '#2d3436',
+    '14' = '#2d3436',
+    '15' = '#2d3436'
+  )
+)
+
+edgeAttrs <- list(
+  color = list(
+    '2~6' = '#eb4d4b',
+    '2~8' = '#eb4d4b',
+    '2~9' = '#eb4d4b',
+    '4~6' = '#eb4d4b',
+    '4~7' = '#eb4d4b',
+    '4~8' = '#eb4d4b',
+    '5~7' = '#eb4d4b',
+    '7~12' = '#e056fd',
+    '7~15' = '#e056fd',
+    '9~12' = '#e056fd'
   )
 )
 
 plot(groupDAG@graph, attrs=list(
   edge=list(color='black')
-), nodeAttrs=nAttrs)
-```
-
-```{r}
-miRNAs_groups[[5]]
-mes_groups[[6]]
+), nodeAttrs=nAttrs, edgeAttrs=edgeAttrs)
 ```

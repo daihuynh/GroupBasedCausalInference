@@ -31,7 +31,7 @@ conditional_independence_group_test <- function(dag, groups, setA, setB, setC, r
     foreach(j = 1:lengthB, .combine='c', .packages='pcalg') %dopar% {
       ifelse(dsep(groupA[i], groupB[j], cond_set, dag), 0, 1)
     }
-  
+
   # d-connected if
   # If A(active) >= A(total * ratio) &&
   #    B(active) >= B(active * ratio)
@@ -39,29 +39,6 @@ conditional_independence_group_test <- function(dag, groups, setA, setB, setC, r
       sum(rowSums(result) > 0) < limB) {
     return(T)
   }
-  
-  # flag1 <- array(FALSE, dim = lengthA)
-  # flag2 <- array(FALSE, dim = lengthB)
-  
-  # for (i in 1:lengthA) {
-  #   for (j in 1:lengthB) {
-  #     if (!dsep(groupA[i], groupB[j], cond_set, dag)) {
-  #       return(F)
-  #     }
-  #   }
-    # flag2 <- foreach (j = 1:lengthB,
-    #                   .combine = 'c',
-    #                   .packages = "pcalg") %dopar% {
-    #                     return(!dsep(groupA[i], groupB[j], cond_set, dag))
-    #                   }
-    # 
-    # if (sum(flag2 == T) >= round(limiteB)) {
-    #   flag1[i] <- T 
-    # }
-    # 
-    # if (sum(flag1 == T) >= round(limiteA)) {
-    #   return(F)
-    # }
-  # }
+
   return(F)
 }

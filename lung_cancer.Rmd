@@ -7,7 +7,7 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-Sys.setenv(JAVA_HOME='E:/Program Files/Java/jre1.8.0_271/bin')
+Sys.setenv(JAVA_HOME='E:/Program Files/Java/jre1.8.0_271/')
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -196,6 +196,7 @@ groups <- c(
     convert_to_col_numbers(epi_groups, cancer_dm),
     convert_to_col_numbers(mes_groups, cancer_dm)
   )
+# 11:22 AM
 groupDAG <- learn_skeleton_group_pc(
   dag = learned_dag,
   groups =  groups,
