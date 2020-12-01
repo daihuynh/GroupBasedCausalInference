@@ -253,7 +253,7 @@ groups <- c(
     convert_to_col_numbers(epi_groups, cancer_dm),
     convert_to_col_numbers(mes_groups, cancer_dm)
   )
-# 11:33 AM
+# 01:00 AM
 groupDAG <- learn_skeleton_group_pc(
   dag = learned_dag,
   groups =  groups,
@@ -266,10 +266,82 @@ groupDAG <- learn_skeleton_group_pc(
 saveRDS(groupDAG, config$output$epiMarkersGroupDag)
 ```
 
+```{r, include=F}
+
+# ==== 1.5 Cancer data for the experiment ====
+cancer_dm <- cbind(cancer.miRNAs[, mes_markers], 
+                   cancer.mRNAs[, epithelial], 
+                   cancer.mRNAs[, mesenchymal])
+
+# ==== 3.1 Learn the variable DAG
+pdag <- pc(list(C = cor(cancer_dm), 
+                n = nrow(cancer_dm)),
+           indepTest = gaussCItest,
+           alpha = 0.05,
+           p = ncol(cancer_dm))
+
+saveRDS(pdag, config$output$mesMarkersVariableDag)
+
+learned_dag <- pdag2dag(pdag@graph)
+learned_dag <- as(learned_dag$graph, "graphNEL")
+
+# ==== 3.1 Learn the group DAG skeleton
+groups <- c(
+    convert_to_col_numbers(mes_marker_groups, cancer_dm),
+    convert_to_col_numbers(epi_groups, cancer_dm),
+    convert_to_col_numbers(mes_groups, cancer_dm)
+  )
+# 07:25 AM
+groupDAG <- learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  ratio = 0.90,
+  p = length(groups),
+  numCores = 10,
+  verbose = T
+)
+
+saveRDS(groupDAG, config$output$mesMarkersGroupDag)
+```
 
 
+```{r, include=F}
 
+# ==== 1.5 Cancer data for the experiment ====
+cancer_dm <- cbind(cancer.miRNAs[, both_markers], 
+                   cancer.mRNAs[, epithelial], 
+                   cancer.mRNAs[, mesenchymal])
 
+# ==== 3.1 Learn the variable DAG
+pdag <- pc(list(C = cor(cancer_dm), 
+                n = nrow(cancer_dm)),
+           indepTest = gaussCItest,
+           alpha = 0.05,
+           p = ncol(cancer_dm))
+
+saveRDS(pdag, config$output$bothMarkersVariableDag)
+
+learned_dag <- pdag2dag(pdag@graph)
+learned_dag <- as(learned_dag$graph, "graphNEL")
+
+# ==== 3.1 Learn the group DAG skeleton
+groups <- c(
+    convert_to_col_numbers(both_marker_groups, cancer_dm),
+    convert_to_col_numbers(epi_groups, cancer_dm),
+    convert_to_col_numbers(mes_groups, cancer_dm)
+  )
+# 07:25 AM
+groupDAG <- learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  ratio = 0.90,
+  p = length(groups),
+  numCores = 10,
+  verbose = T
+)
+
+saveRDS(groupDAG, config$output$bothMarkersGroupDag)
+```
 
 
 
