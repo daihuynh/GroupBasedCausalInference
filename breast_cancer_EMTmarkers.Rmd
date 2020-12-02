@@ -209,6 +209,10 @@ emt_df %>%
 
 # Step 2: Grouping
 ```{r, include = F}
+# Reuse epi and mes groups from top30 miRNA experiment
+load(file=config$data$epigroups)
+load(file=config$data$mesgroups)
+
 # ==== 2.1 Grouping top 30 miRNAs using Module Network =====
 epi_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
                               rawData = cancer.miRNAs[, epi_markers],
@@ -224,7 +228,7 @@ mes_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwor
 # ==== 2.3 Grouping top 30 miRNAs using Module Network =====
 both_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
                               rawData = cancer.miRNAs[, both_markers],
-                              numModules = 3,
+                              numModules = 2,
                               numIterations = 30)
 
 
@@ -242,8 +246,6 @@ mes_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/modul
 save(epi_marker_groups, file=config$output$epiMarkersGroups)
 save(mes_marker_groups, file=config$output$mesMarkersGroups)
 save(both_marker_groups, file=config$output$bothMarkersGroups)
-save(epi_groups, file=config$output$epigroups)
-save(mes_groups, file=config$output$mesgroups)
 ```
 
 # Step 3: Learning group DAG
