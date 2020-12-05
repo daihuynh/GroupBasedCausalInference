@@ -1,0 +1,72 @@
+---
+title: "TF-mRNAs"
+author: "Phuc Dai Huynh"
+date: "11/30/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=F}
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+source("./Scripts/require_packages.R")
+
+require.packages(c("ini", 'readxl', 'dplyr'))
+
+# Read config file
+config <- read.ini('./Configs/tf_mRNAs.ini')
+```
+
+```{r}
+# ==== 1. Load groups ====
+load(file=config$groups$epigroups)
+load(file=config$groups$mesgroups)
+
+# ==== 2. Load databases ====
+ppi_db <- read_xls(config$databases$PPI, sheet='S6')
+trrust_db <- read.table(config$databases$TRRUST, sep='\t', header=F)
+
+for (i in (1:(length(epi_groups) - 1))) {
+  for (j in 2:length(epi_groups)) {
+    print(paste(i, '-', j))
+    if (i != j) {
+      ppi_db  %>%
+        dplyr::filter(((`Input-node Gene Symbol` %in% epi_groups[[i]]) | 
+                        (`Output-node Gene Symbol` %in% epi_groups[[i]])) &
+                        ((`Input-node Gene Symbol` %in% epi_groups[[j]]) | 
+                        (`Output-node Gene Symbol` %in% epi_groups[[j]]))) %>% print()
+    }
+  }
+}
+
+for (i in (1:(length(epi_groups) - 1))) {
+  for (j in 2:length(epi_groups)) {
+    print(paste(i, '-', j))
+    if (i != j) {
+      trrust_db  %>%
+        rowwise() %>%
+        dplyr::filter(((V1 %in% epi_groups[[i]]) | 
+                        (V1 %in% epi_groups[[i]])) &
+                        ((V2 %in% epi_groups[[j]]) | 
+                        (V2 %in% epi_groups[[j]]))) %>% print()
+    }
+  }
+}
+  
+for (i in (1:(length(mes_groups) - 1))) {
+  for (j in 2:length(mes_groups)) {
+    print(paste(i, '-', j))
+    if (i != j) {
+      trrust_db  %>%
+        rowwise() %>%
+        dplyr::filter(((V1 %in% mes_groups[[i]]) | 
+                        (V1 %in% mes_groups[[i]])) &
+                        ((V2 %in% mes_groups[[j]]) | 
+                        (V2 %in% mes_groups[[j]]))) %>% print()
+    }
+  }
+}
+```

@@ -1,0 +1,59 @@
+---
+title: "validation"
+author: "Phuc Dai Huynh"
+date: "12/1/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=F}
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+source("./Scripts/require_packages.R")
+
+require.packages(c("ini", 'readxl', 'dplyr'))
+
+# Read config file
+config <- read.ini('./Configs/validation.ini')
+
+load(file=config$groups$miRNAgroups)
+load(file=config$groups$epigroups)
+load(file=config$groups$mesgroups)
+```
+
+```{r}
+# ==== 1. Load databases ====
+miRTarbase <- read_xlsx(config$databases$miRTarbase)
+
+miRTarbase %>%
+  dplyr::filter((`Species (miRNA)` == 'Homo sapiens') &
+                  (`Species (Target Gene)` == 'Homo sapiens')) %>%
+  dplyr::select(-c(`Species (miRNA)`, `Species (Target Gene)`)) -> miRTarbase
+
+load(config$databases$miRWalkv2)
+```
+
+```{r}
+groupDAG <- readRDS(config$groups$dag)
+
+miRNAs_group_len <- length(miRNAs_groups)
+epi_group_len <- length(epi_groups)
+
+for (miRNAs_group in 1:miRNAs_group_len) {
+  if (length(groupDAG@graph@edgeL[[miRNAs_group]]) > 0) {
+    edges <- unlist(groupDAG@graph@edgeL[[miRNAs_group]])
+    for (edge in edges) {
+      if (length(edge) > 0 && edge > miRNAs_group_len && edge <= (miRNAs_group_len + epi_group_len)) {
+        print(paste("miRNA group ", miRNAs_group, " Epi group ", edge))
+        miRTarbase  %>%
+          rowwise() %>%
+          dplyr::filter((miRNA %in% miRNAs_groups[[miRNAs_group]]) & (`Target Gene` %in% epi_groups[[edge - miRNAs_group_len]])) %>% 
+          print()
+      }
+    }
+  }
+}
+```
