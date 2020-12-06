@@ -7,7 +7,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r, include=F}
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 library(Rgraphviz)
@@ -40,61 +40,67 @@ nAttrs <- list(
     '13' = '#0984e3',
     '14' = '#0984e3',
     '15' = '#0984e3'
-  ),
-  color = c(
-    '1' = 'white',
-    '2' = 'white',
-    '3' = 'white',
-    '4' = 'white',
-    '5' = 'white',
-    '6' = 'white',
-    '7' = 'white',
-    '8' = 'white',
-    '9' = 'white',
-    '10' = 'white',
-    '11' = 'white',
-    '12' = 'white',
-    '13' = 'white',
-    '14' = 'white',
-    '15' = 'white'
-  ),
-  fontcolor =  c(
-    '1' = '',
-    '2' = '#2d3436',
-    '3' = '#2d3436',
-    '4' = '#2d3436',
-    '5' = '#2d3436',
-    '6' = '#2d3436',
-    '7' = '#2d3436',
-    '8' = '#2d3436',
-    '9' = '#2d3436',
-    '10' = '#2d3436',
-    '11' = '#2d3436',
-    '12' = '#2d3436',
-    '13' = '#2d3436',
-    '14' = '#2d3436',
-    '15' = '#2d3436'
   )
 )
 
 edgeAttrs <- list(
   color = list(
-    '2~6' = '#eb4d4b',
-    '2~8' = '#eb4d4b',
-    '2~9' = '#eb4d4b',
-    '4~6' = '#eb4d4b',
-    '4~7' = '#eb4d4b',
-    '4~8' = '#eb4d4b',
-    '5~7' = '#eb4d4b',
-    '7~12' = '#e056fd',
-    '7~15' = '#e056fd',
-    '9~12' = '#e056fd'
+    '2~7' = '#f9ca24',
+    '4~6' = '#f9ca24',
+    '4~7' = '#f9ca24',
+    '4~8' = '#f9ca24',
+    '4~9' = '#f9ca24',
+    '4~10' = '#f9ca24',
+    '4~12' = '#e056fd',
+    '5~6' = '#f9ca24',
+    '5~7' = '#f9ca24',
+    '5~8' = '#f9ca24',
+    
+    '8~14' = '#6ab04c',
+    '8~15' = '#6ab04c',
+    '10~14' = '#6ab04c',
+    
+    '6~7' = '#00cec9',
+    '6~8' = '#00cec9',
+    '6~9' = '#00cec9',
+    '6~10' = '#00cec9',
+    '7~8' = '#00cec9',
+    '7~9' = '#00cec9',
+    '7~10' = '#00cec9',
+    '8~9' = '#00cec9',
+    '8~10' = '#00cec9',
+    '9~10' = '#00cec9',
+    
+    '11~12'= '#0984e3',
+    '11~14'= '#0984e3',
+    '11~15'= '#0984e3',
+    '12~14'= '#0984e3',
+    '12~15'= '#0984e3',
+    '13~14'= '#0984e3',
+    '13~15'= '#0984e3',
+    '14~15'= '#0984e3'
   )
 )
 
-plot(groupDAG@graph, attrs=list(
-  edge=list(color='black')
-), nodeAttrs=nAttrs, edgeAttrs=edgeAttrs)
+plot(
+  groupDAG@graph,
+  attrs = list(
+    graph = list(rankdir = 'LR'),
+    node = list(
+      color = 'white',
+      fontcolor = '#2d3436',
+      fontsize = 20
+    ),
+    edge = list(
+      color = '#eb4d4b',
+      arrowhead = 'open',
+      arrowhead = 'none',
+      arrowtail = 'none'
+    )
+  ),
+  nodeAttrs = nAttrs,
+  edgeAttrs = edgeAttrs
+)
 ```
 
 ```{r}

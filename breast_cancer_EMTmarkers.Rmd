@@ -138,8 +138,12 @@ emt_markers_df <- read.csv(config$data$emtmarkers,header = F)
 # Epithelial markers
 emt_markers_df %>%
   dplyr::filter(V2 == 'Pro-epithelial') %>%
-  mutate(miRNA = paste('hsa-', V1, sep='')) %>%
+  mutate(miRNA = ifelse(startsWith(V1, 'EBV'), V1, paste('hsa-', V1, sep=''))) %>%
   pull(miRNA) %>%
+  # Convert to Mature name
+  miRNA_PrecursorToMature('v21') %>%
+  mutate(Mature1 = ifelse(is.na(Mature1), OriginalName, Mature1)) %>%
+  pull(Mature1) %>%
   # Convert Mature 1 to miRNA names in v21
   miRNAVersionConvert("v21") %>%
   # Fix missing values in TargetName by taking back OriginalName values
@@ -156,8 +160,12 @@ write.csv(as.data.frame(epi_markers),
 # Mesenchymal markers
 emt_markers_df %>%
   dplyr::filter(V2 == 'Pro-mesenchymal') %>%
-  mutate(miRNA = paste('hsa-', V1, sep='')) %>%
+  mutate(miRNA = ifelse(startsWith(V1, 'EBV'), V1, paste('hsa-', V1, sep=''))) %>%
   pull(miRNA) %>%
+  # Convert to Mature name
+  miRNA_PrecursorToMature('v21') %>%
+  mutate(Mature1 = ifelse(is.na(Mature1), OriginalName, Mature1)) %>%
+  pull(Mature1) %>%
   # Convert Mature 1 to miRNA names in v21
   miRNAVersionConvert("v21") %>%
   # Fix missing values in TargetName by taking back OriginalName values
@@ -174,8 +182,12 @@ write.csv(as.data.frame(mes_markers),
 # Both
 emt_markers_df %>%
   dplyr::filter(V2 == 'Both') %>%
-  mutate(miRNA = paste('hsa-', V1, sep='')) %>%
+  mutate(miRNA = ifelse(startsWith(V1, 'EBV'), V1, paste('hsa-', V1, sep=''))) %>%
   pull(miRNA) %>%
+  # Convert to Mature name
+  miRNA_PrecursorToMature('v21') %>%
+  mutate(Mature1 = ifelse(is.na(Mature1), OriginalName, Mature1)) %>%
+  pull(Mature1) %>%
   # Convert Mature 1 to miRNA names in v21
   miRNAVersionConvert("v21") %>%
   # Fix missing values in TargetName by taking back OriginalName values
@@ -214,38 +226,29 @@ load(file=config$data$epigroups)
 load(file=config$data$mesgroups)
 
 # ==== 2.1 Grouping top 30 miRNAs using Module Network =====
-epi_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
+epi_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar',
                               rawData = cancer.miRNAs[, epi_markers],
-                              numModules = 6,
+                              numModules = 7,
                               numIterations = 30)
 
 # ==== 2.2 Grouping top 30 miRNAs using Module Network =====
-mes_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
+mes_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar',
                               rawData = cancer.miRNAs[, mes_markers],
                               numModules = 3,
                               numIterations = 30)
 
 # ==== 2.3 Grouping top 30 miRNAs using Module Network =====
-both_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
-                              rawData = cancer.miRNAs[, both_markers],
-                              numModules = 2,
-                              numIterations = 30)
-
-
-epi_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
-                              rawData = cancer.mRNAs[, epithelial],
-                              numModules = 5,
-                              numIterations = 30)
-
-mes_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
-                              rawData = cancer.mRNAs[, mesenchymal],
-                              numModules = 5,
-                              numIterations = 30)
+# both_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
+#                               rawData = cancer.miRNAs[, both_markers],
+#                               numModules = 1,
+#                               numIterations = 30)
 
 # Save results
+load(file=config$output$epiMarkersGroups)
+load(file=config$output$mesMarkersGroups)
 save(epi_marker_groups, file=config$output$epiMarkersGroups)
 save(mes_marker_groups, file=config$output$mesMarkersGroups)
-save(both_marker_groups, file=config$output$bothMarkersGroups)
+# save(both_marker_groups, file=config$output$bothMarkersGroups)
 ```
 
 # Step 3: Learning group DAG
@@ -283,9 +286,7 @@ groupDAG <- learn_skeleton_group_pc(
 )
 
 saveRDS(groupDAG, config$output$epiMarkersGroupDag)
-```
 
-```{r, include=F}
 # ==== 3.2.1 Mes Marker data matrix for the experiment ====
 cancer_dm <- cbind(cancer.miRNAs[, mes_markers], 
                    cancer.mRNAs[, epithelial], 
@@ -321,7 +322,6 @@ groupDAG <- learn_skeleton_group_pc(
 saveRDS(groupDAG, config$output$mesMarkersGroupDag)
 ```
 
-
 ```{r, include=F}
 # ==== 3.3.1 Mes Marker data matrix for the experiment ====
 cancer_dm <- cbind(cancer.miRNAs[, both_markers], 
@@ -342,10 +342,13 @@ learned_dag <- as(learned_dag$graph, "graphNEL")
 
 # ==== 3.3.3 Learn the group DAG skeleton ====
 groups <- c(
-    convert_to_col_numbers(both_marker_groups, cancer_dm),
+    # convert_to_col_numbers(both_marker_groups, cancer_dm),
+    c(''),
     convert_to_col_numbers(epi_groups, cancer_dm),
     convert_to_col_numbers(mes_groups, cancer_dm)
   )
+groups[[1]] = as.character(which(both_markers %in% colnames(cancer_dm)))
+
 # 07:25 AM
 groupDAG <- learn_skeleton_group_pc(
   dag = learned_dag,

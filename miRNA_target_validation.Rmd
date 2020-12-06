@@ -1,0 +1,144 @@
+---
+title: "validation"
+author: "Phuc Dai Huynh"
+date: "12/1/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=F}
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+source("./Scripts/require_packages.R")
+
+require.packages(c("ini", 'readxl', 'dplyr'))
+
+# Read config file
+config <- read.ini('./Configs/miRNA-target.ini')
+
+# Load group data
+load(file=config$groups$miRNAgroups)
+load(file=config$groups$epigroups)
+load(file=config$groups$mesgroups)
+load(file=config$groups$epiMarkerGroups)
+load(file=config$groups$mesMarkerGroups)
+load(file=config$groups$bothMarkerGroups)
+```
+
+```{r}
+# ==== 1. Load databases ====
+miRTarbase <- read_xlsx(config$databases$miRTarbase)
+
+miRTarbase %>%
+  dplyr::filter((`Species (miRNA)` == 'Homo sapiens') &
+                  (`Species (Target Gene)` == 'Homo sapiens')) %>%
+  dplyr::select(miRNA, `Target Gene`) -> miRTarbase
+
+tarbase <- read.table(config$databases$tarbase, sep='\t', header=T)
+tarbase %>%
+  dplyr::filter((`species` == 'Homo sapiens')) %>%
+  rename(miRNA = mirna,
+         `Target Gene` = geneName) %>%
+  dplyr::select(miRNA, `Target Gene`) -> tarbase
+```
+
+```{r}
+validate_miRNA_interaction <- function(groupDAG, groupA, groupB, groupB_start, database) {
+  groupA_len <- length(groupA)
+  groupB_len <- length(groupB)
+  results <- list()
+  for (group in 1:groupA_len) {
+    if (length(groupDAG@graph@edgeL[[group]]) > 0) {
+      edges <- unlist(groupDAG@graph@edgeL[[group]])
+      for (edge in edges) {
+        if (length(edge) > 0 &&
+            edge > groupB_start &&
+            edge <= (groupB_start + groupB_len)) {
+          print(paste("Group A: ", group, " - Group B: ", edge))
+          database  %>%
+            rowwise() %>%
+            dplyr::filter((miRNA %in% groupA[[group]]) &
+                            (`Target Gene` %in% groupB[[edge - groupB_start]])) -> result
+          results[[length(results) + 1]] <- result
+        }
+      }
+    }
+  }
+  return(results)
+}
+```
+
+```{r}
+# Load top30 miRNA's group DAG
+groupDAG <- readRDS(config$groups$dag)
+
+miRNAs_group_len <- length(miRNAs_groups)
+epi_group_len <- length(epi_groups)
+
+miRNA_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, epi_groups, 5, tarbase)
+miRNA_epi_interaction_tarbase
+
+miRNA_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, epi_groups, 5, miRTarbase)
+miRNA_epi_interaction_miRTarbase
+
+
+miRNA_mes_interaction_tarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, mes_groups, 10, tarbase)
+miRNA_mes_interaction_tarbase
+
+miRNA_mes_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, mes_groups, 10, miRTarbase)
+miRNA_mes_interaction_miRTarbase
+```
+
+```{r}
+epi_markers <- unlist(epi_marker_groups)
+mes_markers <- unlist(mes_marker_groups)
+both_markers <- unlist(both_marker_groups)
+
+miRNA_group1_epi_markers <- which(miRNAs_groups[[1]] %in% epi_markers)
+miRNAs_groups[[1]][miRNA_group1_epi_markers]
+
+miRNA_group2_epi_markers <- which(miRNAs_groups[[2]] %in% epi_markers)
+miRNAs_groups[[2]][miRNA_group2_epi_markers]
+
+miRNA_group3_epi_markers <- which(miRNAs_groups[[3]] %in% epi_markers)
+miRNAs_groups[[3]][miRNA_group3_epi_markers]
+
+miRNA_group4_epi_markers <- which(miRNAs_groups[[4]] %in% epi_markers)
+miRNAs_groups[[4]][miRNA_group4_epi_markers]
+
+miRNA_group5_epi_markers <- which(miRNAs_groups[[5]] %in% epi_markers)
+miRNAs_groups[[5]][miRNA_group5_epi_markers]
+
+miRNA_group1_mes_markers <- which(miRNAs_groups[[1]] %in% mes_markers)
+miRNAs_groups[[1]][miRNA_group1_mes_markers]
+
+miRNA_group2_mes_markers <- which(miRNAs_groups[[2]] %in% mes_markers)
+miRNAs_groups[[2]][miRNA_group2_mes_markers]
+
+miRNA_group3_mes_markers <- which(miRNAs_groups[[3]] %in% mes_markers)
+miRNAs_groups[[3]][miRNA_group3_mes_markers]
+
+miRNA_group4_mes_markers <- which(miRNAs_groups[[4]] %in% mes_markers)
+miRNAs_groups[[4]][miRNA_group4_mes_markers]
+
+miRNA_group5_mes_markers <- which(miRNAs_groups[[5]] %in% mes_markers)
+miRNAs_groups[[5]][miRNA_group5_mes_markers]
+
+miRNA_group1_both_markers <- which(miRNAs_groups[[1]] %in% both_markers)
+miRNAs_groups[[1]][miRNA_group1_both_markers]
+
+miRNA_group2_both_markers <- which(miRNAs_groups[[2]] %in% both_markers)
+miRNAs_groups[[2]][miRNA_group2_both_markers]
+
+miRNA_group3_both_markers <- which(miRNAs_groups[[3]] %in% both_markers)
+miRNAs_groups[[3]][miRNA_group3_both_markers]
+
+miRNA_group4_both_markers <- which(miRNAs_groups[[4]] %in% both_markers)
+miRNAs_groups[[4]][miRNA_group4_both_markers]
+
+miRNA_group5_both_markers <- which(miRNAs_groups[[5]] %in% both_markers)
+miRNAs_groups[[5]][miRNA_group5_both_markers]
+```
