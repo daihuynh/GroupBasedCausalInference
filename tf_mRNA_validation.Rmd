@@ -32,18 +32,19 @@ tfs <- read.csv(config$databases$hg19)
 
 ppi_db <- read_xls(config$databases$PPI, sheet='S6')
 ppi_db %>%
-  rename(input = `Input-node Gene Symbol`,
-         output = `Output-node Gene Symbol`) %>%
-  select(input, output) -> ppi_db
+  dplyr::rename(input = 'Input-node Gene Symbol',
+         output = 'Output-node Gene Symbol') %>%
+  dplyr::select(input, output) -> ppi_db
 
 trrust_db <- read.table(config$databases$TRRUST, sep='\t', header=F)
 trrust_db %>%
-  rename(input = V1,
+  dplyr::rename(input = V1,
          output = V2) %>%
-  select(input, output) -> trrust_db
+  dplyr::select(input, output) -> trrust_db
 
 load(file=config$databases$ENCODE)
 load(file=config$databases$TRED)
+load(file=config$databases$STRING)
 ```
 
 ```{r}
@@ -77,6 +78,20 @@ get_tf <- function(groups) {
   }
   return(results)
 }
+
+get_tf_binding_genes <- function(entrez_id) {
+  matched_entrez_id <- names(String_Gene_Gene)[which(names(String_Gene_Gene) %in% c(as.character(entrez_id)))]
+  
+  if (length(matched_entrez_id) == 0) {
+    return(c())
+  }
+  validated_binding <- String_Gene_Gene[[matched_entrez_id]]
+  
+  gene_symbols <- as.vector(unlist(translate(validated_binding, org.Hs.egSYMBOL)))
+  
+  return(gene_symbols)
+}
+
 ```
 
 ```{r}
@@ -97,18 +112,30 @@ mes_gropup_binding_trrust
 tf_in_epi_groups <- get_tf(epi_groups)
 tf_in_epi_groups
 
+epi_genes <- unlist(epi_groups)
+
+tfs %>%
+  dplyr::select(EntrezGene, Symbol) %>%
+  dplyr::filter(Symbol %in% unlist(epi_groups)) -> epi_tfs
+
+tf_bindings <- sapply(epi_tfs$EntrezGene, FUN=get_tf_binding_genes)
+names(tf_bindings) <- epi_tfs$Symbol
+```
+
+```{r}
 tf_in_mes_groups <- get_tf(mes_groups)
 tf_in_mes_groups
 
-tf_list %>%
-  dplyr::filter(SYMBOL %in% unlist(epi_groups)) -> test
-hg19 %>%
-  dplyr::filter(Symbol %in% unlist(epi_groups)) -> test2
+mes_genes <- unlist(mes_groups)
 
-mRNA_entrezids <- union(names(Reactome_Gene_Gene), names(String_Gene_Gene))
+tfs %>%
+  dplyr::select(EntrezGene, Symbol) %>%
+  dplyr::filter(Symbol %in% unlist(mes_groups)) -> mes_tfs
 
-names(Reactome_Gene_Gene)[which(names(Reactome_Gene_Gene) %in% as.character(test$ENTREZID))]
-names(String_Gene_Gene)[which(names(String_Gene_Gene) %in% as.character(test$ENTREZID))]
+mes_non_tfs <- mes_genes[-which(mes_genes %in% mes_tfs$Symbol)]
+  
+tf_bindings <- sapply(mes_tfs$EntrezGene, FUN=get_tf_binding_genes)
+names(tf_bindings) <- mes_tfs$Symbol
 
-mapIds(org.Hs.eg.db, test$SYMBOL, 'ENTREZID', 'SYMBOL')
+mes_non_tfs[which(mes_non_tfs %in% as.vector(unlist(tf_bindings)))]
 ```
