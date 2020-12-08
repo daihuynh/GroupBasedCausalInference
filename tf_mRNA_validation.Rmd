@@ -42,22 +42,86 @@ trrust_db %>%
          output = V2) %>%
   dplyr::select(input, output) -> trrust_db
 
-load(file=config$databases$ENCODE)
-load(file=config$databases$TRED)
 load(file=config$databases$STRING)
+load(file=config$databases$Reactome)
+load(file=config$databases$TRED)
+load(file=config$databases$ENCODE)
 ```
 
+
 ```{r}
-validate_internal_TF_mRNA <- function(group, database) {
+get_tf <- function(groups) {
   results <- list()
-  for (i in (1:(length(group)))) {
-    for (j in 1:length(group)) {
+  for (group in groups) {
+    tfs %>%
+      dplyr::filter(Symbol %in% group) %>%
+      pull(Symbol) -> result
+  
+    results[[length(results) + 1]] <- result
+  }
+  return(results)
+}
+
+get_tf_binding_genes <- function(groups, database) {
+  results <- list()
+  
+  for (group in groups) {
+    if (!is.na(as.integer(names(database)[1]))) {
+      tfs %>%
+        dplyr::filter(Symbol %in% group) %>%
+        pull(EntrezGene) -> entrez_id
+      
+      matched_entrez_id <-
+        names(database)[which(names(database) %in% c(as.character(entrez_id)))]
+    } else {
+      print(names(database))
+      print(group)
+      matched_entrez_id <-
+        names(database)[which(names(database) %in% c(as.character(group)))]
+    }
+    
+    if (length(matched_entrez_id) == 0) {
+      results[[length(results) + 1]] <- vector()
+      next
+    }
+    validated_binding <- database[[matched_entrez_id]]
+    
+    result <- as.vector(unlist(translate(validated_binding, org.Hs.egSYMBOL)))
+    
+    results[[length(results) + 1]] <- result
+  }
+  
+  return(results)
+}
+
+validate_internal_TF_mRNA <- function(tf_groups, gene_groups, database) {
+  results <- list()
+  for (i in (1:(length(tf_groups)))) {
+    for (j in 1:length(gene_groups)) {
       if (i != j) {
         print(paste(i, '-', j))
+        print(tf_groups[[i]])
         database  %>%
-          dplyr::filter((input %in% group[[i]]) &
-                           (output %in% group[[j]])) -> result
+          dplyr::filter((input %in% tf_groups[[i]]) &
+                           (output %in% gene_groups[[j]])) -> result
         
+        results[[length(results) + 1]] <- result
+      }
+    }
+  }
+  
+  return(results)
+}
+
+validate_internal_TF_mRNA_by_entrezids <- function(tf_groups, gene_groups, database) {
+  results <- list()
+  
+  bindings <- get_tf_binding_genes(tf_groups, database)
+  for (i in (1:(length(bindings)))) {
+    for (j in 1:length(gene_groups)) {
+      if (i != j) {
+        print(paste(i, '-', j))
+        result <- gene_groups[[j]][which(gene_groups[[j]] %in% bindings[[i]])]
         results[[length(results) + 1]] <- result
       }
     }
@@ -68,74 +132,45 @@ validate_internal_TF_mRNA <- function(group, database) {
 ```
 
 ```{r}
-get_tf <- function(groups) {
-  results <- list()
-  for (group in groups) {
-    tfs %>%
-      dplyr::filter(Symbol %in% group) -> result
-  
-    results[[length(results) + 1]] <- result
-  }
-  return(results)
-}
-
-get_tf_binding_genes <- function(entrez_id) {
-  matched_entrez_id <- names(String_Gene_Gene)[which(names(String_Gene_Gene) %in% c(as.character(entrez_id)))]
-  
-  if (length(matched_entrez_id) == 0) {
-    return(c())
-  }
-  validated_binding <- String_Gene_Gene[[matched_entrez_id]]
-  
-  gene_symbols <- as.vector(unlist(translate(validated_binding, org.Hs.egSYMBOL)))
-  
-  return(gene_symbols)
-}
-
-```
-
-```{r}
-epi_gropup_binding_ppi <- validate_internal_TF_mRNA(epi_groups, ppi_db)
-epi_gropup_binding_ppi
-
-epi_gropup_binding_trrust <- validate_internal_TF_mRNA(epi_groups, trrust_db)
-epi_gropup_binding_trrust
-
-mes_gropup_binding_ppi <- validate_internal_TF_mRNA(mes_groups, ppi_db)
-mes_gropup_binding_ppi
-
-mes_gropup_binding_trrust <- validate_internal_TF_mRNA(mes_groups, trrust_db)
-mes_gropup_binding_trrust
-```
-
-```{r}
 tf_in_epi_groups <- get_tf(epi_groups)
 tf_in_epi_groups
 
-epi_genes <- unlist(epi_groups)
+epi_gropup_binding_ppi <- validate_internal_TF_mRNA(tf_in_epi_groups, epi_groups, ppi_db)
+epi_gropup_binding_ppi
 
-tfs %>%
-  dplyr::select(EntrezGene, Symbol) %>%
-  dplyr::filter(Symbol %in% unlist(epi_groups)) -> epi_tfs
+epi_gropup_binding_trrust <- validate_internal_TF_mRNA(tf_in_epi_groups, epi_groups, trrust_db)
+epi_gropup_binding_trrust
 
-tf_bindings <- sapply(epi_tfs$EntrezGene, FUN=get_tf_binding_genes)
-names(tf_bindings) <- epi_tfs$Symbol
+epi_gropup_binding_string <- validate_internal_TF_mRNA_by_entrezids(tf_in_epi_groups, epi_groups, String_Gene_Gene)
+epi_gropup_binding_string
+
+epi_gropup_binding_reactome <- validate_internal_TF_mRNA_by_entrezids(tf_in_epi_groups, epi_groups, Reactome_Gene_Gene)
+epi_gropup_binding_reactome
+
+epi_gropup_binding_encode <- validate_internal_TF_mRNA_by_symbols(tf_in_epi_groups, epi_groups, ENCODE)
+epi_gropup_binding_encode
 ```
 
 ```{r}
 tf_in_mes_groups <- get_tf(mes_groups)
 tf_in_mes_groups
 
-mes_genes <- unlist(mes_groups)
+mes_gropup_binding_ppi <- validate_internal_TF_mRNA(tf_in_mes_groups, mes_groups, ppi_db)
+mes_gropup_binding_ppi
 
-tfs %>%
-  dplyr::select(EntrezGene, Symbol) %>%
-  dplyr::filter(Symbol %in% unlist(mes_groups)) -> mes_tfs
+mes_gropup_binding_trrust <- validate_internal_TF_mRNA(tf_in_mes_groups, mes_groups, trrust_db)
+mes_gropup_binding_trrust
 
-mes_non_tfs <- mes_genes[-which(mes_genes %in% mes_tfs$Symbol)]
-  
-tf_bindings <- sapply(mes_tfs$EntrezGene, FUN=get_tf_binding_genes)
-names(tf_bindings) <- mes_tfs$Symbol
+mes_gropup_binding_string <- validate_internal_TF_mRNA_by_entrezids(tf_in_mes_groups, mes_groups, String_Gene_Gene)
+mes_gropup_binding_string
 
-mes_non_tfs[which(mes_non_tfs %in% as.vector(unlist(tf_bindings)))]
+mes_gropup_binding_reactome <- validate_internal_TF_mRNA_by_entrezids(tf_in_mes_groups, mes_groups, Reactome_Gene_Gene)
+mes_gropup_binding_reactome
+
+mes_gropup_binding_reactome <- validate_internal_TF_mRNA_by_entrezids(tf_in_mes_groups, mes_groups, Reactome_Gene_Gene)
+mes_gropup_binding_reactome
+
+mes_gropup_binding_encode <- validate_internal_TF_mRNA_by_symbols(tf_in_mes_groups, mes_groups, ENCODE)
+mes_gropup_binding_encode
+```
 ```
