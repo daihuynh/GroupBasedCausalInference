@@ -234,21 +234,19 @@ epi_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwor
 # ==== 2.2 Grouping top 30 miRNAs using Module Network =====
 mes_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar',
                               rawData = cancer.miRNAs[, mes_markers],
-                              numModules = 3,
+                              numModules = 2,
                               numIterations = 30)
 
 # ==== 2.3 Grouping top 30 miRNAs using Module Network =====
-# both_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
-#                               rawData = cancer.miRNAs[, both_markers],
-#                               numModules = 1,
-#                               numIterations = 30)
+both_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar',
+                              rawData = cancer.miRNAs[, both_markers],
+                              numModules = 1,
+                              numIterations = 30)
 
 # Save results
-load(file=config$output$epiMarkersGroups)
-load(file=config$output$mesMarkersGroups)
 save(epi_marker_groups, file=config$output$epiMarkersGroups)
 save(mes_marker_groups, file=config$output$mesMarkersGroups)
-# save(both_marker_groups, file=config$output$bothMarkersGroups)
+save(both_marker_groups, file=config$output$bothMarkersGroups)
 ```
 
 # Step 3: Learning group DAG
