@@ -203,18 +203,11 @@ pdag <- pc(list(C = cor(cancer_dm),
            p = ncol(cancer_dm))
 
 saveRDS(pdag, config$output$variable_dag)
-# pdag <- readRDS('./Results/variable_dag.rds')
-
-load(file=config$output$miRNAgroups)
-load(file=config$output$epigroups)
-load(file=config$output$mesgroups)
 
 learned_dag <- pdag2dag(pdag@graph)
 learned_dag <- as(learned_dag$graph, "graphNEL")
 
 # ==== 3.1 Learn the group DAG skeleton
-# source('./Scripts/learn_group_skeleton_pc.R')
-# source('./Scripts/conditional_independence_group_test.R')
 groups <- c(
     convert_to_col_numbers(miRNAs_groups, cancer_dm),
     convert_to_col_numbers(epi_groups, cancer_dm),
@@ -230,7 +223,6 @@ groupDAG <- learn_skeleton_group_pc(
   verbose = T
 )
 
-# groupDAG <- readRDS('./Results/group_dag.rds')
 saveRDS(groupDAG, config$output$group_dag)
 
 plot(groupDAG)
