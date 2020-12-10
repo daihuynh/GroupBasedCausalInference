@@ -1,0 +1,177 @@
+---
+title: "Algorithm Validation"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=F}
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+source("./Scripts/require_packages.R")
+
+require.packages(c("ini"))
+
+# Read config file
+config <- read.ini('./Configs/algorithm_validation.ini')
+
+# Set JAVA_HOME so that rJava and jdx can be loaded properly
+Sys.setenv(JAVA_HOME='/Users/daihuynh/Downloads/OpenJDK8U-jdk_x64_mac_hotspot_8u242b08/jre')
+
+require.packages(c(
+  "rJava", "jdx",
+  "foreach", "doParallel",
+  "dplyr", "magrittr",
+  "BiocManager"
+))
+
+require.bio_packages(c(
+  "CancerSubtypes",
+  "miRBaseConverter", "miRLAB",
+  "pcalg", "Rgraphviz"
+))
+
+# If there is any error while importing grouping_using_module_network.R, 
+# please ignore it since it is just an error of Rstudio.
+# Solution is to update Rstudio to 1.2.5036-1 or newer.
+source("./Scripts/grouping_using_module_network.R")
+source("./Scripts/conditional_independence_group_test.R")
+source("./Scripts/learn_group_skeleton_pc.R")
+```
+
+```{r}
+group_4 = c('hsa-miR-675-5p', 'hsa-miR-149-5p', 'hsa-miR-196a-5p', 'hsa-miR-9-5p')
+group_7 = c('EZR', 'VAV3', 'RAB11FIP1', 'DHCR24', 'CHD1', 
+            'GPRC5A', 'PERP', 'TOB1', 'SPINT1')
+group_12 = c('FYN', 'SNAI2', 'SLC2A3', 'PTPRC', 'MPDZ', 
+             'RECK', 'PLEKHO1', 'GNG11', 'JAM3', 'AKT3', 
+             'GFPT2', 'AKAP12', 'SACS', 'ZEB1', 'SPOCK1', 
+             'AP1S2', 'COLEC12')
+```
+
+```{r}
+# Load the normal genes dataset and the anomaly genes dataset
+load(paste(config$data$anomaly, sep=""))
+load(paste(config$data$normal, sep=""))
+
+# Load scan data
+scan_df <- read.csv(config$data$scan)
+
+# ==== 1.1 Process cancer data =====
+cancer.miRNAs <- matchedData$miRs
+cancer.mRNAs <- matchedData$mRNAs
+
+cancer.version <- checkMiRNAVersion(colnames(cancer.miRNAs),verbose=FALSE)
+
+if (cancer.version != "v21") {
+  # Convert miRNA names in Cancer dataset from current version (v20) to v21
+  cancer.miRNAs %>%
+    # Select miRNA names
+    colnames() %>%
+    # Convert miRNA names to premature names
+    miRNA_PrecursorToMature("v21") %>%
+    # Fill NA values in Mature1 by values in OriginalName
+    mutate(Mature1 = ifelse(is.na(Mature1), OriginalName, Mature1)) %>%
+    # Select Mature 1
+    pull(Mature1) %>%
+    # Convert Mature 1 to miRNA names in v21
+    miRNAVersionConvert("v21") %>%
+    # Fix missing values in TargetName by taking back OriginalName values
+    mutate(TargetName = ifelse(is.na(TargetName), OriginalName, TargetName)) -> miRNANames_v21
+  colnames(cancer.miRNAs) <- miRNANames_v21$TargetName
+  remove(miRNANames_v21)
+}
+
+# Select miRNAs in cancer dataset that are also living in the scan dataset
+cancer.miRNAs <- cancer.miRNAs[, colnames(cancer.miRNAs) %in% unique(scan_df$miRNAName)]
+
+
+# ==== 1.2 Process normal data =====
+normal.miRNAs <- BRCA_matchedData_normal_samples$miRs
+
+normal.version <- checkMiRNAVersion(colnames(normal.miRNAs),verbose=FALSE)
+
+if (normal.version != "v21") {
+  # Convert miRNA names in Normal dataset from current version (v20) to v21
+  normal.miRNAs %>%
+    # Select miRNA names
+    colnames() %>%
+    # Convert miRNA names to premature names
+    miRNA_PrecursorToMature("v21") %>%
+    # Fill NA values in Mature1 by values in OriginalName
+    mutate(Mature1 = ifelse(is.na(Mature1), OriginalName, Mature1)) %>%
+    # Select Mature 1
+    pull(Mature1) %>%
+    # Convert Mature 1 to miRNA names in v21
+    miRNAVersionConvert("v21") %>%
+    # Fix missing values in TargetName by taking back OriginalName values
+    mutate(TargetName = ifelse(is.na(TargetName), OriginalName, TargetName)) -> miRNANames_v21
+  colnames(normal.miRNAs) <- miRNANames_v21$TargetName
+  remove(miRNANames_v21)
+}
+
+# Select miRNAs in cancer dataset that are also living in the scan dataset
+normal.miRNAs <- normal.miRNAs[, colnames(normal.miRNAs) %in% unique(scan_df$miRNAName)]
+
+
+# ==== 1.3 Merge duplications =====
+# There are some duplications in cancer.miRNAs, therefore those duplications
+# will be merged together by taking means.
+miRNA_names <- colnames(cancer.miRNAs)
+
+duplicated_miRNAs <- unique(miRNA_names[duplicated(miRNA_names)])
+
+for (duplicated_miRNA in duplicated_miRNAs) {
+  # Get column names again as the matrix sinks after a loops
+  miRNA_names <- colnames(cancer.miRNAs)
+  # Find duplicated's column index
+  col_index <- which(miRNA_names == duplicated_miRNA)
+  # Merge them by taking row means
+  merged <- as.matrix(rowMeans(cancer.miRNAs[, col_index]))
+  # Set column name
+  colnames(merged) <- duplicated_miRNA
+  # Reassign merged at first column index
+  cancer.miRNAs[, col_index[1]] <- merged
+  # Discard the rest in column index
+  cancer.miRNAs <- cancer.miRNAs[,-col_index[2:length(col_index)]]
+}
+
+# ==== 1.5 Cancer data for the experiment ====
+cancer_dm <- cbind(cancer.miRNAs[, group_4], cancer.mRNAs[, group_7], cancer.mRNAs[, group_12])
+```
+
+```{r}
+# ==== 3.1 Learn the variable DAG
+pdag <- pc(list(C = cor(cancer_dm), 
+                n = nrow(cancer_dm)),
+           indepTest = gaussCItest,
+           alpha = 0.05,
+           p = ncol(cancer_dm))
+
+saveRDS(pdag, config$output$variable_dag)
+
+learned_dag <- pdag2dag(pdag@graph)
+learned_dag <- as(learned_dag$graph, "graphNEL")
+
+# ==== 3.1 Learn the group DAG skeleton
+groups <- c(
+    convert_to_col_numbers(group_4, cancer_dm),
+    convert_to_col_numbers(group_7, cancer_dm),
+    convert_to_col_numbers(group_12, cancer_dm)
+  )
+# 11:33 AM
+groupDAG <- learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  ratio = 0.90,
+  p = length(groups),
+  numCores = -1,
+  verbose = T
+)
+
+saveRDS(groupDAG, config$output$group_dag)
+
+plot(groupDAG)
+```
