@@ -12,169 +12,241 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 library(Rgraphviz)
 library(ini)
+
+config <- read.ini('./Configs/visualization.ini')
+```
+
+```{r}
+plot_and_save_as_pdf <- function(filePath, graph, graphAttrs, nodeAttrs, edgeAttrs) {
+  pdf(filePath)
+  plot(
+    graph,
+    attrs = graphAttrs,
+    nodeAttrs = nodeAttrs,
+    edgeAttrs = edgeAttrs
+  )
+  dev.off()
+}
 ```
 
 ```{r}
 # Read config file
-config <- read.ini('./Configs/breast_cancer_top30miRNAs.ini')
+breast_cancer_top30miRNA_config <- read.ini('./Configs/breast_cancer_top30miRNAs.ini')
 
-load(file=config$output$miRNAgroups)
-load(file=config$output$epigroups)
-load(file=config$output$mesgroups)
-groupDAG <- readRDS(config$output$group_dag)
+load(file=breast_cancer_top30miRNA_config$output$miRNAgroups)
+load(file=breast_cancer_top30miRNA_config$output$epigroups)
+load(file=breast_cancer_top30miRNA_config$output$mesgroups)
+groupDAG <- readRDS(breast_cancer_top30miRNA_config$output$group_dag)
 
 nAttrs <- list(
   fillcolor = c(
-    '1' = '#e17055',
-    '2' = '#e17055',
-    '3' = '#e17055',
-    '4' = '#e17055',
-    '5' = '#e17055',
-    '6' = '#00cec9',
-    '7' = '#00cec9',
-    '8' = '#00cec9',
-    '9' = '#00cec9',
-    '10' = '#00cec9',
-    '11' = '#0984e3',
-    '12' = '#0984e3',
-    '13' = '#0984e3',
-    '14' = '#0984e3',
-    '15' = '#0984e3'
+    '1' = config$color$miRNAGroup,
+    '2' = config$color$miRNAGroup,
+    '3' = config$color$miRNAGroup,
+    '4' = config$color$miRNAGroup,
+    '5' = config$color$miRNAGroup,
+    '6' = config$color$epiGroup,
+    '7' = config$color$epiGroup,
+    '8' = config$color$epiGroup,
+    '9' = config$color$epiGroup,
+    '10' = config$color$epiGroup,
+    '11' = config$color$mesGroup,
+    '12' = config$color$mesGroup,
+    '13' = config$color$mesGroup,
+    '14' = config$color$mesGroup,
+    '15' = config$color$mesGroup
   )
 )
 
 edgeAttrs <- list(
   color = list(
-    '2~7' = '#f9ca24',
-    '4~6' = '#f9ca24',
-    '4~7' = '#f9ca24',
-    '4~8' = '#f9ca24',
-    '4~9' = '#f9ca24',
-    '4~10' = '#f9ca24',
-    '4~12' = '#e056fd',
-    '5~6' = '#f9ca24',
-    '5~7' = '#f9ca24',
-    '5~8' = '#f9ca24',
+    '2~7' = config$color$miRNAEpiEdgeColor,
+    '4~6' = config$color$miRNAEpiEdgeColor,
+    '4~7' = config$color$miRNAEpiEdgeColor,
+    '4~8' = config$color$miRNAEpiEdgeColor,
+    '4~9' = config$color$miRNAEpiEdgeColor,
+    '4~10' = config$color$miRNAEpiEdgeColor,
+    '4~12' = config$color$miRNAMesEdgeColor,
+    '5~6' = config$color$miRNAEpiEdgeColor,
+    '5~7' = config$color$miRNAEpiEdgeColor,
+    '5~8' = config$color$miRNAEpiEdgeColor,
     
-    '8~14' = '#6ab04c',
-    '8~15' = '#6ab04c',
-    '10~14' = '#6ab04c',
+    '8~14' = config$color$epiMesEdgeColor,
+    '8~15' = config$color$epiMesEdgeColor,
+    '10~14' = config$color$epiMesEdgeColor,
     
-    '6~7' = '#00cec9',
-    '6~8' = '#00cec9',
-    '6~9' = '#00cec9',
-    '6~10' = '#00cec9',
-    '7~8' = '#00cec9',
-    '7~9' = '#00cec9',
-    '7~10' = '#00cec9',
-    '8~9' = '#00cec9',
-    '8~10' = '#00cec9',
-    '9~10' = '#00cec9',
+    '6~7' = config$color$epiEdgeColor,
+    '6~8' = config$color$epiEdgeColor,
+    '6~9' = config$color$epiEdgeColor,
+    '6~10' = config$color$epiEdgeColor,
+    '7~8' = config$color$epiEdgeColor,
+    '7~9' = config$color$epiEdgeColor,
+    '7~10' = config$color$epiEdgeColor,
+    '8~9' = config$color$epiEdgeColor,
+    '8~10' = config$color$epiEdgeColor,
+    '9~10' = config$color$epiEdgeColor,
     
-    '11~12'= '#0984e3',
-    '11~14'= '#0984e3',
-    '11~15'= '#0984e3',
-    '12~14'= '#0984e3',
-    '12~15'= '#0984e3',
-    '13~14'= '#0984e3',
-    '13~15'= '#0984e3',
-    '14~15'= '#0984e3'
+    '11~12'= config$color$mesEdgeColor,
+    '11~14'= config$color$mesEdgeColor,
+    '11~15'= config$color$mesEdgeColor,
+    '12~14'= config$color$mesEdgeColor,
+    '12~15'= config$color$mesEdgeColor,
+    '13~14'= config$color$mesEdgeColor,
+    '13~15'= config$color$mesEdgeColor,
+    '14~15'= config$color$mesEdgeColor
   )
 )
 
-plot(
-  groupDAG@graph,
-  attrs = list(
+plot_and_save_as_pdf(config$output$cancerTop30miRNAGroupDAG, groupDAG@graph, list(
     graph = list(rankdir = 'LR'),
     node = list(
       color = 'white',
-      fontcolor = '#2d3436',
-      fontsize = 20
+      fontcolor = '#2d3436'
     ),
     edge = list(
-      color = '#eb4d4b',
+      color = config$color$miRNAEdgeColor,
       arrowhead = 'open',
       arrowhead = 'none',
-      arrowtail = 'none'
+      arrowtail = 'none',
+      ldw = '10'
     )
-  ),
-  nodeAttrs = nAttrs,
-  edgeAttrs = edgeAttrs
-)
+  ), nAttrs, edgeAttrs)
 ```
 
 ```{r}
 # Read config file
-config <- read.ini('./Configs/breast_cancer_EMTmarkers.ini')
+breast_cancer_EMTMarker_config <- read.ini('./Configs/breast_cancer_EMTmarkers.ini')
 
-load(file=config$output$epiMarkersGroups)
-load(file=config$output$mesMarkersGroups)
-load(file=config$output$bothMarkersGroups)
+load(file=breast_cancer_EMTMarker_config$output$epiMarkersGroups)
+load(file=breast_cancer_EMTMarker_config$output$mesMarkersGroups)
+load(file=breast_cancer_EMTMarker_config$output$bothMarkersGroups)
 
-groupDAG <- readRDS(config$output$epiMarkersGroupDag)
+groupDAG <- readRDS(breast_cancer_EMTMarker_config$output$epiMarkersGroupDag)
 
 
 nAttrs <- list(
   fillcolor = c(
-    '1' = '#e17055',
-    '2' = '#e17055',
-    '3' = '#e17055',
-    '4' = '#e17055',
-    '5' = '#e17055',
-    '6' = '#e17055',
-    '7' = '#e17055',
-    '8' = '#00cec9',
-    '9' = '#00cec9',
-    '10' = '#00cec9',
-    '11' = '#00cec9',
-    '12' = '#00cec9',
-    '13' = '#0984e3',
-    '14' = '#0984e3',
-    '15' = '#0984e3',
-    '16' = '#0984e3',
-    '17' = '#0984e3'
+    '1' = config$color$miRNAGroup,
+    '2' = config$color$miRNAGroup,
+    '3' = config$color$miRNAGroup,
+    '4' = config$color$miRNAGroup,
+    '5' = config$color$miRNAGroup,
+    '6' = config$color$miRNAGroup,
+    '7' = config$color$miRNAGroup,
+    '8' = config$color$epiGroup,
+    '9' = config$color$epiGroup,
+    '10' = config$color$epiGroup,
+    '11' = config$color$epiGroup,
+    '12' = config$color$epiGroup,
+    '13' = config$color$mesGroup,
+    '14' = config$color$mesGroup,
+    '15' = config$color$mesGroup,
+    '16' = config$color$mesGroup,
+    '17' = config$color$mesGroup
   )
 )
 
 edgeAttrs <- list(
   color = list(
-    '3~11' = '#f9ca24',
+    '3~11' = config$color$miRNAEpiEdgeColor,
     
-    '8~9' = '#00cec9',
-    '8~10' = '#00cec9',
-    '8~11' = '#00cec9',
-    '8~12' = '#00cec9',
-    '9~10' = '#00cec9',
-    '9~11' = '#00cec9',
-    '9~12' = '#00cec9',
-    '10~11' = '#00cec9',
-    '10~12' = '#00cec9',
-    '11~12' = '#00cec9',
+    '8~9' = config$color$epiEdgeColor,
+    '8~10' = config$color$epiEdgeColor,
+    '8~11' = config$color$epiEdgeColor,
+    '8~12' = config$color$epiEdgeColor,
+    '9~10' = config$color$epiEdgeColor,
+    '9~11' = config$color$epiEdgeColor,
+    '9~12' = config$color$epiEdgeColor,
+    '10~11' = config$color$epiEdgeColor,
+    '10~12' = config$color$epiEdgeColor,
+    '11~12' = config$color$epiEdgeColor,
     
-    '12~13' = '#6ab04c',
-    '12~14' = '#6ab04c',
-    '12~16' = '#6ab04c',
+    '7~16' = config$color$epiMesEdgeColor,
+    '8~12' = config$color$epiMesEdgeColor,
+    '8~13' = config$color$epiMesEdgeColor,
+    '8~16' = config$color$epiMesEdgeColor,
+    '9~16' = config$color$epiMesEdgeColor,
+    '11~16' = config$color$epiMesEdgeColor,
     
-    '13~14'= '#0984e3',
-    '13~17'= '#0984e3',
-    '14~16'= '#0984e3',
-    '14~17'= '#0984e3',
-    '15~16'= '#0984e3',
-    '16~17'= '#0984e3'
+    '13~14' = config$color$mesEdgeColor,
+    '13~17' = config$color$mesEdgeColor,
+    '14~16' = config$color$mesEdgeColor,
+    '14~17' = config$color$mesEdgeColor,
+    '15~16' = config$color$mesEdgeColor,
+    '16~17' = config$color$mesEdgeColor,
+    
+    '12~13' = config$color$epiMesEdgeColor,
+    '12~14' = config$color$epiMesEdgeColor,
+    '12~16' = config$color$epiMesEdgeColor
   )
 )
 
-plot(
+plot_and_save_as_pdf(
+  config$output$cancerEpiMarkerGroupDAG,
   groupDAG@graph,
-  attrs = list(
+  graphAttrs = list(
+    graph = list(rankdir = 'LR'),
+    node = list(color = 'white',
+                fontcolor = '#2d3436'),
+    edge = list(
+      color = config$color$miRNAEdgeColor,
+      arrowhead = 'open',
+      arrowhead = 'none',
+      arrowtail = 'none',
+      ldw = '10'
+    )
+  ),
+  nodeAttrs = nAttrs,
+  edgeAttrs = edgeAttrs
+)
+```
+
+```{r}
+groupDAG <- readRDS(breast_cancer_EMTMarker_config$output$mesMarkersGroupDag)
+
+nAttrs <- list(
+  fillcolor = c(
+    '1' = config$color$miRNAGroup,
+    '2' = config$color$miRNAGroup,
+    '3' = config$color$epiGroup,
+    '4' = config$color$epiGroup,
+    '5' = config$color$epiGroup,
+    '6' = config$color$epiGroup,
+    '7' = config$color$epiGroup,
+    '8' = config$color$mesGroup,
+    '9' = config$color$mesGroup,
+    '10' = config$color$mesGroup,
+    '11' = config$color$mesGroup,
+    '12' = config$color$mesGroup
+  )
+)
+
+edgeAttrs <- list(
+  color = list(
+    '2~4' = config$color$miRNAEpiEdgeColor,
+    
+    '2~12' = config$color$miRNAMesEdgeColor,
+    
+    '8~9'= config$color$mesEdgeColor,
+    '9~11'= config$color$mesEdgeColor,
+    '9~12'= config$color$mesEdgeColor,
+    '10~11'= config$color$mesEdgeColor,
+    '10~12'= config$color$mesEdgeColor,
+    '11~12'= config$color$mesEdgeColor
+  )
+)
+
+plot_and_save_as_pdf(
+  config$output$cancerMesMarkerGroupDAG,
+  groupDAG@graph,
+  graphAttrs = list(
     graph = list(rankdir = 'LR'),
     node = list(
       color = 'white',
-      fontcolor = '#2d3436',
-      fontsize = 20
+      fontcolor = '#2d3436'
     ),
     edge = list(
-      color = '#eb4d4b',
+      color = config$color$epiEdgeColor,
       arrowhead = 'open',
       arrowhead = 'none',
       arrowtail = 'none'
@@ -186,108 +258,52 @@ plot(
 ```
 
 ```{r}
-groupDAG <- readRDS(config$output$mesMarkersGroupDag)
-
-
-nAttrs <- list(
-  fillcolor = c(
-    '1' = '#e17055',
-    '2' = '#e17055',
-    '3' = '#00cec9',
-    '4' = '#00cec9',
-    '5' = '#00cec9',
-    '6' = '#00cec9',
-    '7' = '#00cec9',
-    '8' = '#0984e3',
-    '9' = '#0984e3',
-    '10' = '#0984e3',
-    '11' = '#0984e3',
-    '12' = '#0984e3'
-  )
-)
-
-edgeAttrs <- list(
-  color = list(
-    '2~4' = '#f9ca24',
-    '2~12' = '#e056fd',
-    
-    '8~9'= '#0984e3',
-    '9~11'= '#0984e3',
-    '9~12'= '#0984e3',
-    '10~11'= '#0984e3',
-    '10~12'= '#0984e3',
-    '11~12'= '#0984e3'
-  )
-)
-
-plot(
-  groupDAG@graph,
-  attrs = list(
-    graph = list(rankdir = 'LR'),
-    node = list(
-      color = 'white',
-      fontcolor = '#2d3436',
-      fontsize = 20
-    ),
-    edge = list(
-      color = '#00cec9',
-      arrowhead = 'open',
-      arrowhead = 'none',
-      arrowtail = 'none'
-    )
-  ),
-  nodeAttrs = nAttrs,
-  edgeAttrs = edgeAttrs
-)
-```
-
-```{r}
-groupDAG <- readRDS(config$output$bothMarkersGroupDag)
+groupDAG <- readRDS(breast_cancer_EMTMarker_config$output$bothMarkersGroupDag)
 
 
 
 nAttrs <- list(
   fillcolor = c(
-    '1' = '#e17055',
-    '2' = '#00cec9',
-    '3' = '#00cec9',
-    '4' = '#00cec9',
-    '5' = '#00cec9',
-    '6' = '#00cec9',
-    '7' = '#0984e3',
-    '8' = '#0984e3',
-    '9' = '#0984e3',
-    '10' = '#0984e3',
-    '11' = '#0984e3'
+    '1' = config$color$miRNAGroup,
+    '2' = config$color$epiGroup,
+    '3' = config$color$epiGroup,
+    '4' = config$color$epiGroup,
+    '5' = config$color$epiGroup,
+    '6' = config$color$epiGroup,
+    '7' = config$color$mesGroup,
+    '8' = config$color$mesGroup,
+    '9' = config$color$mesGroup,
+    '10' = config$color$mesGroup,
+    '11' = config$color$mesGroup
   )
 )
 
 edgeAttrs <- list(
   color = list(
-    '4~7' = '#6ab04c',
-    '5~8' = '#6ab04c',
-    '5~11' = '#6ab04c',
+    '4~7' = config$color$epiMesEdgeColor,
+    '5~8' = config$color$epiMesEdgeColor,
+    '5~11' = config$color$epiMesEdgeColor,
     
-    '7~8'= '#0984e3',
-    '7~10'= '#0984e3',
-    '7~11'= '#0984e3',
-    '8~10'= '#0984e3',
-    '8~11'= '#0984e3',
-    '10~11'= '#0984e3'
+    '7~8'= config$color$mesEdgeColor,
+    '7~10'= config$color$mesEdgeColor,
+    '7~11'= config$color$mesEdgeColor,
+    '8~10'= config$color$mesEdgeColor,
+    '8~11'= config$color$mesEdgeColor,
+    '10~11'= config$color$mesEdgeColor
   )
 )
 
-plot(
+plot_and_save_as_pdf(
+  config$output$cancerBothMarkerGroupDAG,
   groupDAG@graph,
-  attrs = list(
+  graphAttrs = list(
     graph = list(rankdir = 'LR'),
     node = list(
       color = 'white',
-      fontcolor = '#2d3436',
-      fontsize = 20
+      fontcolor = '#2d3436'
     ),
     edge = list(
-      color = '#00cec9',
+      color = config$color$epiEdgeColor,
       arrowhead = 'open',
       arrowhead = 'none',
       arrowtail = 'none'

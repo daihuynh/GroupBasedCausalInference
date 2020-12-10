@@ -1,8 +1,5 @@
 ---
-title: Group-based causal inference methods for identifying cooperative microRNA-mRNA
-  regulatory relationships in Epithelial-Mesenchymal Transition
-author: "Phuc Dai Huynh"
-date: "11/12/2020"
+title: "Algorithm Validation"
 output: pdf_document
 ---
 
@@ -10,7 +7,7 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r, include=F}
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 source("./Scripts/require_packages.R")
@@ -18,10 +15,10 @@ source("./Scripts/require_packages.R")
 require.packages(c("ini"))
 
 # Read config file
-config <- read.ini('./Configs/breast_cancer_top30miRNAs.ini')
+config <- read.ini('./Configs/algorithm_validation.ini')
 
 # Set JAVA_HOME so that rJava and jdx can be loaded properly
-Sys.setenv(JAVA_HOME=config$env$JAVA_HOME)
+Sys.setenv(JAVA_HOME='/Users/daihuynh/Downloads/OpenJDK8U-jdk_x64_mac_hotspot_8u242b08/jre')
 
 require.packages(c(
   "rJava", "jdx",
@@ -44,8 +41,17 @@ source("./Scripts/conditional_independence_group_test.R")
 source("./Scripts/learn_group_skeleton_pc.R")
 ```
 
-# Step 1: Data Preparation
-```{r, include=F}
+```{r}
+group_4 = c('hsa-miR-675-5p', 'hsa-miR-149-5p', 'hsa-miR-196a-5p', 'hsa-miR-9-5p')
+group_7 = c('EZR', 'VAV3', 'RAB11FIP1', 'DHCR24', 'CHD1', 
+            'GPRC5A', 'PERP', 'TOB1', 'SPINT1')
+group_12 = c('FYN', 'SNAI2', 'SLC2A3', 'PTPRC', 'MPDZ', 
+             'RECK', 'PLEKHO1', 'GNG11', 'JAM3', 'AKT3', 
+             'GFPT2', 'AKAP12', 'SACS', 'ZEB1', 'SPOCK1', 
+             'AP1S2', 'COLEC12')
+```
+
+```{r}
 # Load the normal genes dataset and the anomaly genes dataset
 load(paste(config$data$anomaly, sep=""))
 load(paste(config$data$normal, sep=""))
@@ -132,69 +138,11 @@ for (duplicated_miRNA in duplicated_miRNAs) {
   cancer.miRNAs <- cancer.miRNAs[,-col_index[2:length(col_index)]]
 }
 
-# ==== 1.4 Select top 30 miRNAs having significantly different expression =====
-# Need to transpose data matrix since the function requires matrices having:
-#   - rows: genomic features (gene names)
-#   - columns: cancer samples (observations)
-result <- FSbyMAD(t(cancer.miRNAs),
-                  cut.type = 'topk',
-                  value = 30)
-top30_miRNAs <- rownames(result)
-
-# Save to file
-write.csv(as.data.frame(top30_miRNAs), 
-          file=config$output$top30miRNAs, 
-          col.names = F,
-          row.names = F)
-
-
-# ==== 1.5 EMT =====
-# The reason why I read from .txt files instead of CSV or EXCEL file is because
-# some gene names are automatically converted into datetime by Microsoft Excel
-emt_df <- cbind(read.table(config$data$emtnames,stringsAsFactors=FALSE, header = FALSE),
-                read.table(config$data$emttypes,stringsAsFactors=FALSE, header = FALSE))
-colnames(emt_df) <- c("mRNAs", "Type")
-
-# Only select mRNAs that exist in cancer dataset
-available_mRNAs <- colnames(matchedData$mRNAs[, colnames(matchedData$mRNAs) %in% emt_df$mRNAs])
-
-emt_df %>%
-  filter(mRNAs %in% available_mRNAs, Type == 'Epi') %>%
-  pull(mRNAs) -> epithelial
-emt_df %>%
-  filter(mRNAs %in% available_mRNAs, Type == 'Mes') %>%
-  pull(mRNAs) -> mesenchymal
-  
 # ==== 1.5 Cancer data for the experiment ====
-cancer_dm <- cbind(cancer.miRNAs[, top30_miRNAs], cancer.mRNAs[, epithelial], cancer.mRNAs[, mesenchymal])
+cancer_dm <- cbind(cancer.miRNAs[, group_4], cancer.mRNAs[, group_7], cancer.mRNAs[, group_12])
 ```
 
-# Step 2: Grouping
-```{r, include=F}
-# ==== 2.1 Grouping top 30 miRNAs using Module Network =====
-miRNAs_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
-                              rawData = cancer_dm[, top30_miRNAs],
-                              numModules = 5,
-                              numIterations = 30)
-
-epi_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
-                              rawData = cancer_dm[, epithelial],
-                              numModules = 5,
-                              numIterations = 30)
-
-mes_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
-                              rawData = cancer_dm[, mesenchymal],
-                              numModules = 5,
-                              numIterations = 30)
-
-# Save results
-save(miRNAs_groups, file=config$output$miRNAgroups)
-save(epi_groups, file=config$output$epigroups)
-save(mes_groups, file=config$output$mesgroups)
-```
-
-# Step 3: Learning group DAG
-```{r, include=F}
+```{r}
 # ==== 3.1 Learn the variable DAG
 pdag <- pc(list(C = cor(cancer_dm), 
                 n = nrow(cancer_dm)),
@@ -209,9 +157,9 @@ learned_dag <- as(learned_dag$graph, "graphNEL")
 
 # ==== 3.1 Learn the group DAG skeleton
 groups <- c(
-    convert_to_col_numbers(miRNAs_groups, cancer_dm),
-    convert_to_col_numbers(epi_groups, cancer_dm),
-    convert_to_col_numbers(mes_groups, cancer_dm)
+    list(seq(1, length(group_4))),
+    list(seq(length(group_4) + 1, length(group_4) + length(group_7))),
+    list(seq(length(group_4) + length(group_7) + 1, length(group_4) + length(group_7) + length(group_12)))
   )
 # 11:33 AM
 groupDAG <- learn_skeleton_group_pc(
@@ -227,34 +175,3 @@ saveRDS(groupDAG, config$output$group_dag)
 
 plot(groupDAG)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
