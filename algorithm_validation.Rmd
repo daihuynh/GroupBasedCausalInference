@@ -157,9 +157,9 @@ learned_dag <- as(learned_dag$graph, "graphNEL")
 
 # ==== 3.1 Learn the group DAG skeleton
 groups <- c(
-    convert_to_col_numbers(group_4, cancer_dm),
-    convert_to_col_numbers(group_7, cancer_dm),
-    convert_to_col_numbers(group_12, cancer_dm)
+    list(seq(1, length(group_4))),
+    list(seq(length(group_4) + 1, length(group_4) + length(group_7))),
+    list(seq(length(group_4) + length(group_7) + 1, length(group_4) + length(group_7) + length(group_12)))
   )
 # 11:33 AM
 groupDAG <- learn_skeleton_group_pc(
