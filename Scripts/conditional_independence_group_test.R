@@ -42,3 +42,29 @@ conditional_independence_group_test <- function(dag, groups, setA, setB, setC, r
 
   return(F)
 }
+
+#'@title conditional_independence_group_test
+#'@description Learn a skeleton DAG by using PC algorithm along with our proposed conditional independence test, delta-d-separation
+#'@param dag The variable DAG learnt by using PC algorithm.
+#'@param groups The country where the data was recorded 
+#'@param setA Set of vertices in group A.
+#'@param setB Set of vertices in group B.
+#'@param setC Set of vertices in conditioning group C.
+#'@return TRUE if group A and group B conditional independent given group C, FALSE for otherwise
+bn_conditional_independence_group_test <- function(dag, groups, setA, setB, setC) {
+  cond_set = c()
+  if (length(setC) > 0) {
+    for (i in 1:length(setC))
+      cond_set = c(cond_set, groups[[setC[i]]])
+  }
+  
+  groupA <- groups[[setA]]
+  groupB <- groups[[setB]]
+  
+  for (i in groupA) {
+    for (j in groupB) {
+      if (!dsep(i, j, cond_set, dag)) return(F)
+    }
+  }
+  return(T)
+}
