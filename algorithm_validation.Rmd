@@ -42,7 +42,10 @@ source("./Scripts/learn_group_skeleton_pc.R")
 ```
 
 ```{r}
+group_2 = c('hsa-miR-204-5p', 'hsa-miR-202-5p', 'hsa-miR-135a-5p')
 group_4 = c('hsa-miR-675-5p', 'hsa-miR-149-5p', 'hsa-miR-196a-5p', 'hsa-miR-9-5p')
+group_5 = c('hsa-miR-4326', 'hsa-miR-577', 'hsa-miR-3200-5p', 'hsa-miR-31-5p',
+            'hsa-miR-33b-5p', 'hsa-miR-592')
 group_7 = c('EZR', 'VAV3', 'RAB11FIP1', 'DHCR24', 'CHD1', 
             'GPRC5A', 'PERP', 'TOB1', 'SPINT1')
 group_12 = c('FYN', 'SNAI2', 'SLC2A3', 'PTPRC', 'MPDZ', 
@@ -139,7 +142,11 @@ for (duplicated_miRNA in duplicated_miRNAs) {
 }
 
 # ==== 1.5 Cancer data for the experiment ====
-cancer_dm <- cbind(cancer.miRNAs[, group_4], cancer.mRNAs[, group_7], cancer.mRNAs[, group_12])
+cancer_dm <- cbind(cancer.miRNAs[, group_2],
+                   cancer.miRNAs[, group_4], 
+                   cancer.miRNAs[, group_5], 
+                   cancer.mRNAs[, group_7], 
+                   cancer.mRNAs[, group_12])
 ```
 
 ```{r}
@@ -157,15 +164,19 @@ learned_dag <- as(learned_dag$graph, "graphNEL")
 
 # ==== 3.1 Learn the group DAG skeleton
 groups <- c(
-    list(seq(1, length(group_4))),
-    list(seq(length(group_4) + 1, length(group_4) + length(group_7))),
-    list(seq(length(group_4) + length(group_7) + 1, length(group_4) + length(group_7) + length(group_12)))
-  )
+  convert_to_col_numbers(list(group_2), cancer_dm),
+  convert_to_col_numbers(list(group_4), cancer_dm),
+  convert_to_col_numbers(list(group_5), cancer_dm),
+  convert_to_col_numbers(list(group_7), cancer_dm),
+  convert_to_col_numbers(list(group_12), cancer_dm)
+)
 # 11:33 AM
+source('./Scripts/conditional_independence_group_test.R')
+source('./Scripts/learn_group_skeleton_pc.R')
 groupDAG <- learn_skeleton_group_pc(
   dag = learned_dag,
   groups =  groups,
-  ratio = 0.90,
+  ratio = 0.01,
   p = length(groups),
   numCores = -1,
   verbose = T
@@ -174,4 +185,28 @@ groupDAG <- learn_skeleton_group_pc(
 saveRDS(groupDAG, config$output$group_dag)
 
 plot(groupDAG)
+
+bnGroupDAG <- bn_learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  p = length(groups),
+  verbose = T
+)
+
+saveRDS(bnGroupDAG, config$output$bn_group_dag)
+
+plot(bnGroupDAG)
+
+groupDAGExp <- learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  ratio = 0.90,
+  p = length(groups),
+  numCores = -1,
+  verbose = T
+)
+
+saveRDS(groupDAGExp, config$output$group_dag_exp)
+
+plot(groupDAGExp)
 ```
