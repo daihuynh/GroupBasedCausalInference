@@ -42,19 +42,11 @@ source("./Scripts/learn_group_skeleton_pc.R")
 ```
 
 ```{r}
-group_2 = c('hsa-miR-204-5p', 'hsa-miR-202-5p', 'hsa-miR-135a-5p')
-group_4 = c('hsa-miR-675-5p', 'hsa-miR-149-5p', 'hsa-miR-196a-5p', 'hsa-miR-9-5p')
-group_5 = c('hsa-miR-4326', 'hsa-miR-577', 'hsa-miR-3200-5p', 'hsa-miR-31-5p',
-            'hsa-miR-33b-5p', 'hsa-miR-592')
-group_7 = c('EZR', 'VAV3', 'RAB11FIP1', 'DHCR24', 'CHD1', 
-            'GPRC5A', 'PERP', 'TOB1', 'SPINT1')
-group_12 = c('FYN', 'SNAI2', 'SLC2A3', 'PTPRC', 'MPDZ', 
-             'RECK', 'PLEKHO1', 'GNG11', 'JAM3', 'AKT3', 
-             'GFPT2', 'AKAP12', 'SACS', 'ZEB1', 'SPOCK1', 
-             'AP1S2', 'COLEC12')
-```
+# Load groups
+load(config$data$miRNAgroups)
+load(config$data$epigroups)
+load(config$data$mesgroups)
 
-```{r}
 # Load the normal genes dataset and the anomaly genes dataset
 load(paste(config$data$anomaly, sep=""))
 load(paste(config$data$normal, sep=""))
@@ -142,11 +134,10 @@ for (duplicated_miRNA in duplicated_miRNAs) {
 }
 
 # ==== 1.5 Cancer data for the experiment ====
-cancer_dm <- cbind(cancer.miRNAs[, group_2],
-                   cancer.miRNAs[, group_4], 
-                   cancer.miRNAs[, group_5], 
-                   cancer.mRNAs[, group_7], 
-                   cancer.mRNAs[, group_12])
+cancer_dm <- cbind(cancer.miRNAs[, miRNAs_groups[[1]]],
+                   cancer.miRNAs[, miRNAs_groups[[4]]],
+                   cancer.mRNAs[, epi_groups[[5]]], 
+                   cancer.mRNAs[, mes_groups[[4]]])
 ```
 
 ```{r}
@@ -164,15 +155,11 @@ learned_dag <- as(learned_dag$graph, "graphNEL")
 
 # ==== 3.1 Learn the group DAG skeleton
 groups <- c(
-  convert_to_col_numbers(list(group_2), cancer_dm),
-  convert_to_col_numbers(list(group_4), cancer_dm),
-  convert_to_col_numbers(list(group_5), cancer_dm),
-  convert_to_col_numbers(list(group_7), cancer_dm),
-  convert_to_col_numbers(list(group_12), cancer_dm)
+  convert_to_col_numbers(list(miRNAs_groups[[1]]), cancer_dm),
+  convert_to_col_numbers(list(miRNAs_groups[[4]]), cancer_dm),
+  convert_to_col_numbers(list(epi_groups[[5]]), cancer_dm),
+  convert_to_col_numbers(list(mes_groups[[4]]), cancer_dm)
 )
-# 11:33 AM
-source('./Scripts/conditional_independence_group_test.R')
-source('./Scripts/learn_group_skeleton_pc.R')
 groupDAG <- learn_skeleton_group_pc(
   dag = learned_dag,
   groups =  groups,
@@ -207,6 +194,63 @@ groupDAGExp <- learn_skeleton_group_pc(
 )
 
 saveRDS(groupDAGExp, config$output$group_dag_exp)
+
+plot(groupDAGExp)
+```
+
+```{r}
+cancer_dm <- cancer.miRNAs[, unlist(miRNAs_groups)]
+
+# ==== 3.1 Learn the variable DAG
+pdag <- pc(list(C = cor(cancer_dm), 
+                n = nrow(cancer_dm)),
+           indepTest = gaussCItest,
+           alpha = 0.05,
+           p = ncol(cancer_dm))
+
+saveRDS(pdag, config$output$miRNA_variable_dag)
+
+learned_dag <- pdag2dag(pdag@graph)
+learned_dag <- as(learned_dag$graph, "graphNEL")
+
+# ==== 3.1 Learn the group DAG skeleton
+groups <- c(
+  convert_to_col_numbers(miRNAs_groups, cancer_dm)
+)
+groupDAG <- learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  ratio = 0.01,
+  p = length(groups),
+  numCores = -1,
+  verbose = T
+)
+
+saveRDS(groupDAG, config$output$miRNA_group_dag)
+
+plot(groupDAG)
+
+bnGroupDAG <- bn_learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  p = length(groups),
+  verbose = T
+)
+
+saveRDS(bnGroupDAG, config$output$miRNA_bn_group_dag)
+
+plot(bnGroupDAG)
+
+groupDAGExp <- learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  ratio = 0.90,
+  p = length(groups),
+  numCores = -1,
+  verbose = T
+)
+
+saveRDS(groupDAGExp, config$output$miRNA_group_dag_exp)
 
 plot(groupDAGExp)
 ```
