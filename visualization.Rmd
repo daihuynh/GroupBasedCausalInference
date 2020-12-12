@@ -97,7 +97,7 @@ edgeAttrs <- list(
   )
 )
 
-plot_and_save_as_pdf(config$output$cancerTop30miRNAGroupDAG, groupDAG@graph, list(
+plot_and_save_as_pdf(config$output$breastCancerTop30miRNAGroupDAG, groupDAG@graph, list(
     graph = list(rankdir = 'LR'),
     node = list(
       color = 'white',
@@ -182,7 +182,7 @@ edgeAttrs <- list(
 )
 
 plot_and_save_as_pdf(
-  config$output$cancerEpiMarkerGroupDAG,
+  config$output$breastCancerEpiMarkerGroupDAG,
   groupDAG@graph,
   graphAttrs = list(
     graph = list(rankdir = 'LR'),
@@ -237,7 +237,7 @@ edgeAttrs <- list(
 )
 
 plot_and_save_as_pdf(
-  config$output$cancerMesMarkerGroupDAG,
+  config$output$breastCancerMesMarkerGroupDAG,
   groupDAG@graph,
   graphAttrs = list(
     graph = list(rankdir = 'LR'),
@@ -294,7 +294,7 @@ edgeAttrs <- list(
 )
 
 plot_and_save_as_pdf(
-  config$output$cancerBothMarkerGroupDAG,
+  config$output$breastCancerBothMarkerGroupDAG,
   groupDAG@graph,
   graphAttrs = list(
     graph = list(rankdir = 'LR'),
