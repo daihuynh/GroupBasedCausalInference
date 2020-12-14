@@ -26,7 +26,7 @@ Sys.setenv(JAVA_HOME=config$env$JAVA_HOME)
 require.packages(c(
   "rJava", "jdx",
   "foreach", "doParallel",
-  "dplyr", "magrittr",
+  "tidyverse", "dplyr", "magrittr",
   "BiocManager"
 ))
 
@@ -247,6 +247,25 @@ both_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwo
 save(epi_marker_groups, file=config$output$epiMarkersGroups)
 save(mes_marker_groups, file=config$output$mesMarkersGroups)
 save(both_marker_groups, file=config$output$bothMarkersGroups)
+
+# Save results
+readable <- map_dfr(epi_marker_groups, ~as.data.frame(t(.)))
+write.csv(t(readable), 
+          file=config$output$epiMarkersGroupsReadable, 
+          col.names = F,
+          row.names = F)
+
+readable <- map_dfr(mes_marker_groups, ~as.data.frame(t(.)))
+write.csv(t(readable), 
+          file=config$output$mesMarkersGroupsReadable, 
+          col.names = F,
+          row.names = F)
+
+readable <- map_dfr(both_marker_groups, ~as.data.frame(t(.)))
+write.csv(readable, 
+          file=config$output$bothMarkersGroupsReadable, 
+          col.names = F,
+          row.names = F)
 ```
 
 # Step 3: Learning group DAG

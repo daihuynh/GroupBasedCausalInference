@@ -26,7 +26,7 @@ Sys.setenv(JAVA_HOME=config$env$JAVA_HOME)
 require.packages(c(
   "rJava", "jdx",
   "foreach", "doParallel",
-  "dplyr", "magrittr",
+  "tidyverse", "dplyr", "magrittr",
   "BiocManager"
 ))
 
@@ -191,6 +191,24 @@ mes_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/modul
 save(miRNAs_groups, file=config$output$miRNAgroups)
 save(epi_groups, file=config$output$epigroups)
 save(mes_groups, file=config$output$mesgroups)
+
+readable <- map_dfr(miRNAs_groups, ~as.data.frame(t(.)))
+write.csv(t(readable), 
+          file=config$output$miRNAgroupsReadable, 
+          col.names = F,
+          row.names = F)
+
+readable <- map_dfr(epi_groups, ~as.data.frame(t(.)))
+write.csv(t(readable), 
+          file=config$output$epigroupsReadable, 
+          col.names = F,
+          row.names = F)
+
+readable <- map_dfr(mes_groups, ~as.data.frame(t(.)))
+write.csv(t(readable), 
+          file=config$output$mesgroupsReadable, 
+          col.names = F,
+          row.names = F)
 ```
 
 # Step 3: Learning group DAG
