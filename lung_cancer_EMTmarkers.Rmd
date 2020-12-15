@@ -323,6 +323,12 @@ groupDAG <- learn_skeleton_group_pc(
 
 saveRDS(groupDAG, config$output$mesMarkersGroupDag)
 
+```
+
+```{r}
+load(config$output$bothMarkersGroups)
+
+
 # ==== 3.3.1 Mes Marker data matrix for the experiment ====
 cancer_dm <- cbind(cancer.miRNAs[, both_markers], 
                    cancer.mRNAs[, epithelial], 
@@ -336,6 +342,12 @@ pdag <- pc(list(C = cor(cancer_dm),
            p = ncol(cancer_dm))
 
 saveRDS(pdag, config$output$bothMarkersVariableDag)
+
+
+```
+
+```{r}
+pdag <- readRDS(config$output$bothMarkersVariableDag)
 
 learned_dag <- pdag2dag(pdag@graph)
 learned_dag <- as(learned_dag$graph, "graphNEL")
