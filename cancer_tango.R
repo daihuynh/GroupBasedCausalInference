@@ -1,0 +1,256 @@
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+source("./Scripts/require_packages.R")
+
+require.packages(c("ini"))
+
+# Read config file
+config <- read.ini('./Configs/breast_cancer_top30miRNAs.ini')
+
+# Set JAVA_HOME so that rJava and jdx can be loaded properly
+Sys.setenv(JAVA_HOME=config$env$JAVA_HOME)
+
+require.packages(c(
+  "rJava", "jdx",
+  "foreach", "doParallel",
+  "tidyverse", "dplyr", "magrittr",
+  "BiocManager"
+))
+
+require.bio_packages(c(
+  "CancerSubtypes",
+  "miRBaseConverter", "miRLAB",
+  "pcalg", "Rgraphviz"
+))
+
+# If there is any error while importing grouping_using_module_network.R, 
+# please ignore it since it is just an error of Rstudio.
+# Solution is to update Rstudio to 1.2.5036-1 or newer.
+source("./Scripts/grouping_using_module_network.R")
+source("./Scripts/conditional_independence_group_test.R")
+source("./Scripts/learn_group_skeleton_pc.R")
+
+# Step 1: Data Preparation
+# Load the normal genes dataset and the anomaly genes dataset
+load(paste(config$data$anomaly, sep=""))
+load(paste(config$data$normal, sep=""))
+
+# Load scan data
+scan_df <- read.csv(config$data$scan)
+
+# ==== 1.1 Process cancer data =====
+cancer.miRNAs <- matchedData$miRs
+cancer.mRNAs <- matchedData$mRNAs
+
+cancer.version <- checkMiRNAVersion(colnames(cancer.miRNAs),verbose=FALSE)
+
+if (cancer.version != "v21") {
+  # Convert miRNA names in Cancer dataset from current version (v20) to v21
+  cancer.miRNAs %>%
+    # Select miRNA names
+    colnames() %>%
+    # Convert miRNA names to premature names
+    miRNA_PrecursorToMature("v21") %>%
+    # Fill NA values in Mature1 by values in OriginalName
+    mutate(Mature1 = ifelse(is.na(Mature1), OriginalName, Mature1)) %>%
+    # Select Mature 1
+    pull(Mature1) %>%
+    # Convert Mature 1 to miRNA names in v21
+    miRNAVersionConvert("v21") %>%
+    # Fix missing values in TargetName by taking back OriginalName values
+    mutate(TargetName = ifelse(is.na(TargetName), OriginalName, TargetName)) -> miRNANames_v21
+  colnames(cancer.miRNAs) <- miRNANames_v21$TargetName
+  remove(miRNANames_v21)
+}
+
+# Select miRNAs in cancer dataset that are also living in the scan dataset
+cancer.miRNAs <- cancer.miRNAs[, colnames(cancer.miRNAs) %in% unique(scan_df$miRNAName)]
+
+
+# ==== 1.2 Process normal data =====
+normal.miRNAs <- BRCA_matchedData_normal_samples$miRs
+
+normal.version <- checkMiRNAVersion(colnames(normal.miRNAs),verbose=FALSE)
+
+if (normal.version != "v21") {
+  # Convert miRNA names in Normal dataset from current version (v20) to v21
+  normal.miRNAs %>%
+    # Select miRNA names
+    colnames() %>%
+    # Convert miRNA names to premature names
+    miRNA_PrecursorToMature("v21") %>%
+    # Fill NA values in Mature1 by values in OriginalName
+    mutate(Mature1 = ifelse(is.na(Mature1), OriginalName, Mature1)) %>%
+    # Select Mature 1
+    pull(Mature1) %>%
+    # Convert Mature 1 to miRNA names in v21
+    miRNAVersionConvert("v21") %>%
+    # Fix missing values in TargetName by taking back OriginalName values
+    mutate(TargetName = ifelse(is.na(TargetName), OriginalName, TargetName)) -> miRNANames_v21
+  colnames(normal.miRNAs) <- miRNANames_v21$TargetName
+  remove(miRNANames_v21)
+}
+
+# Select miRNAs in cancer dataset that are also living in the scan dataset
+normal.miRNAs <- normal.miRNAs[, colnames(normal.miRNAs) %in% unique(scan_df$miRNAName)]
+
+
+# ==== 1.3 Merge duplications =====
+# There are some duplications in cancer.miRNAs, therefore those duplications
+# will be merged together by taking means.
+miRNA_names <- colnames(cancer.miRNAs)
+
+duplicated_miRNAs <- unique(miRNA_names[duplicated(miRNA_names)])
+
+for (duplicated_miRNA in duplicated_miRNAs) {
+  # Get column names again as the matrix sinks after a loops
+  miRNA_names <- colnames(cancer.miRNAs)
+  # Find duplicated's column index
+  col_index <- which(miRNA_names == duplicated_miRNA)
+  # Merge them by taking row means
+  merged <- as.matrix(rowMeans(cancer.miRNAs[, col_index]))
+  # Set column name
+  colnames(merged) <- duplicated_miRNA
+  # Reassign merged at first column index
+  cancer.miRNAs[, col_index[1]] <- merged
+  # Discard the rest in column index
+  cancer.miRNAs <- cancer.miRNAs[,-col_index[2:length(col_index)]]
+}
+
+# ==== 1.4 Select top 30 miRNAs having significantly different expression =====
+# Need to transpose data matrix since the function requires matrices having:
+#   - rows: genomic features (gene names)
+#   - columns: cancer samples (observations)
+result <- FSbyMAD(t(cancer.miRNAs),
+                  cut.type = 'topk',
+                  value = 30)
+top30_miRNAs <- rownames(result)
+
+# Save to file
+write.csv(as.data.frame(top30_miRNAs), 
+          file=config$output$top30miRNAs, 
+          col.names = F,
+          row.names = F)
+
+
+# ==== 1.5 EMT =====
+# The reason why I read from .txt files instead of CSV or EXCEL file is because
+# some gene names are automatically converted into datetime by Microsoft Excel
+emt_df <- cbind(read.table(config$data$emtnames,stringsAsFactors=FALSE, header = FALSE),
+                read.table(config$data$emttypes,stringsAsFactors=FALSE, header = FALSE))
+colnames(emt_df) <- c("mRNAs", "Type")
+
+# Only select mRNAs that exist in cancer dataset
+available_mRNAs <- colnames(matchedData$mRNAs[, colnames(matchedData$mRNAs) %in% emt_df$mRNAs])
+
+emt_df %>%
+  filter(mRNAs %in% available_mRNAs, Type == 'Epi') %>%
+  pull(mRNAs) -> epithelial
+emt_df %>%
+  filter(mRNAs %in% available_mRNAs, Type == 'Mes') %>%
+  pull(mRNAs) -> mesenchymal
+
+# ==== 1.5 Cancer data for the experiment ====
+cancer_dm <- cbind(cancer.miRNAs[, top30_miRNAs], cancer.mRNAs[, epithelial], cancer.mRNAs[, mesenchymal])
+
+# Step 2: Grouping
+# ==== 2.1 Grouping top 30 miRNAs using Module Network =====
+miRNAs_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
+                                               rawData = cancer_dm[, top30_miRNAs],
+                                               numModules = 5,
+                                               numIterations = 30)
+
+epi_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
+                                            rawData = cancer_dm[, epithelial],
+                                            numModules = 5,
+                                            numIterations = 30)
+
+mes_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
+                                            rawData = cancer_dm[, mesenchymal],
+                                            numModules = 5,
+                                            numIterations = 30)
+
+# Save results
+save(miRNAs_groups, file=config$output$miRNAgroups)
+save(epi_groups, file=config$output$epigroups)
+save(mes_groups, file=config$output$mesgroups)
+
+readable <- map_dfr(miRNAs_groups, ~as.data.frame(t(.)))
+write.csv(t(readable), 
+          file=config$output$miRNAgroupsReadable, 
+          col.names = F,
+          row.names = F)
+
+readable <- map_dfr(epi_groups, ~as.data.frame(t(.)))
+write.csv(t(readable), 
+          file=config$output$epigroupsReadable, 
+          col.names = F,
+          row.names = F)
+
+readable <- map_dfr(mes_groups, ~as.data.frame(t(.)))
+write.csv(t(readable), 
+          file=config$output$mesgroupsReadable, 
+          col.names = F,
+          row.names = F)
+
+# Step 3: Learning group DAG
+# ==== 3.1 Learn the variable DAG
+pdag <- pc(list(C = cor(cancer_dm), 
+                n = nrow(cancer_dm)),
+           indepTest = gaussCItest,
+           alpha = 0.05,
+           p = ncol(cancer_dm))
+
+saveRDS(pdag, config$output$variable_dag)
+
+learned_dag <- pdag2dag(pdag@graph)
+learned_dag <- as(learned_dag$graph, "graphNEL")
+
+# ==== 3.1 Learn the group DAG skeleton
+groups <- c(
+  convert_to_col_numbers(miRNAs_groups, cancer_dm),
+  convert_to_col_numbers(epi_groups, cancer_dm),
+  convert_to_col_numbers(mes_groups, cancer_dm)
+)
+# 11:33 AM
+groupDAG <- learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  ratio = 0.90,
+  p = length(groups),
+  numCores = -1,
+  verbose = T
+)
+
+saveRDS(groupDAG, config$output$group_dag)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
