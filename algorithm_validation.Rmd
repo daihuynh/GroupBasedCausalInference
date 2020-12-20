@@ -1,23 +1,26 @@
 ---
-title: Group-based causal inference methods for identifying cooperative microRNA-mRNA
-  regulatory relationships in Epithelial-Mesenchymal Transition
-author: "Phuc Dai Huynh"
-date: "11/12/2020"
+title: "Algorithm Validation"
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-Sys.setenv(JAVA_HOME='E:/Program Files/Java/jre1.8.0_271/')
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r, include=F}
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 source("./Scripts/require_packages.R")
 
+require.packages(c("ini"))
+
+# Read config file
+config <- read.ini('./Configs/algorithm_validation.ini')
+
+# Set JAVA_HOME so that rJava and jdx can be loaded properly
+Sys.setenv(JAVA_HOME='/Users/daihuynh/Downloads/OpenJDK8U-jdk_x64_mac_hotspot_8u242b08/jre')
+
 require.packages(c(
-  "ini",
   "rJava", "jdx",
   "foreach", "doParallel",
   "dplyr", "magrittr",
@@ -38,10 +41,11 @@ source("./Scripts/conditional_independence_group_test.R")
 source("./Scripts/learn_group_skeleton_pc.R")
 ```
 
-# Step 1: Data Preparation
 ```{r}
-# Read config file
-config <- read.ini('./Configs/cancer.ini')
+# Load groups
+load(config$data$miRNAgroups)
+load(config$data$epigroups)
+load(config$data$mesgroups)
 
 # Load the normal genes dataset and the anomaly genes dataset
 load(paste(config$data$anomaly, sep=""))
@@ -107,69 +111,95 @@ if (normal.version != "v21") {
 normal.miRNAs <- normal.miRNAs[, colnames(normal.miRNAs) %in% unique(scan_df$miRNAName)]
 
 
-# ==== 1.3 Select top 30 miRNAs having significantly different expression =====
-# Need to transpose data matrix since the function requires matrices having:
-#   - rows: genomic features (gene names)
-#   - columns: cancer samples (observations)
-result <- FSbyMAD(t(cancer.miRNAs),
-                  cut.type = 'topk',
-                  value = 30)
-top30_miRNAs <- rownames(result)
+# ==== 1.3 Merge duplications =====
+# There are some duplications in cancer.miRNAs, therefore those duplications
+# will be merged together by taking means.
+miRNA_names <- colnames(cancer.miRNAs)
 
-# Save to file
-write.csv(as.data.frame(top30_miRNAs), 
-          file=config$output$top30miRNAs, 
-          col.names = F,
-          row.names = F)
+duplicated_miRNAs <- unique(miRNA_names[duplicated(miRNA_names)])
 
+for (duplicated_miRNA in duplicated_miRNAs) {
+  # Get column names again as the matrix sinks after a loops
+  miRNA_names <- colnames(cancer.miRNAs)
+  # Find duplicated's column index
+  col_index <- which(miRNA_names == duplicated_miRNA)
+  # Merge them by taking row means
+  merged <- as.matrix(rowMeans(cancer.miRNAs[, col_index]))
+  # Set column name
+  colnames(merged) <- duplicated_miRNA
+  # Reassign merged at first column index
+  cancer.miRNAs[, col_index[1]] <- merged
+  # Discard the rest in column index
+  cancer.miRNAs <- cancer.miRNAs[,-col_index[2:length(col_index)]]
+}
 
-# ==== 1.4 EMT =====
-# The reason why I read from .txt files instead of CSV or EXCEL file is because
-# some gene names are automatically converted into datetime by Microsoft Excel
-emt_df <- cbind(read.table(config$data$emtnames,stringsAsFactors=FALSE, header = FALSE),
-                read.table(config$data$emttypes,stringsAsFactors=FALSE, header = FALSE))
-colnames(emt_df) <- c("mRNAs", "Type")
-
-# Only select mRNAs that exist in cancer dataset
-available_mRNAs <- colnames(matchedData$mRNAs[, colnames(matchedData$mRNAs) %in% emt_df$mRNAs])
-
-emt_df %>%
-  filter(mRNAs %in% available_mRNAs, Type == 'Epi') %>%
-  pull(mRNAs) -> epithelial
-emt_df %>%
-  filter(mRNAs %in% available_mRNAs, Type == 'Mes') %>%
-  pull(mRNAs) -> mesenchymal
-  
 # ==== 1.5 Cancer data for the experiment ====
-cancer_dm <- cbind(cancer.miRNAs[, top30_miRNAs], cancer.mRNAs[, epithelial], cancer.mRNAs[, mesenchymal])
+cancer_dm <- cbind(cancer.miRNAs[, miRNAs_groups[[1]]],
+                   cancer.miRNAs[, miRNAs_groups[[4]]],
+                   cancer.mRNAs[, epi_groups[[5]]], 
+                   cancer.mRNAs[, mes_groups[[4]]])
 ```
 
-# Step 2: Grouping
 ```{r}
-# ==== 2.1 Grouping top 30 miRNAs using Module Network =====
-miRNAs_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
-                              rawData = cancer_dm[, top30_miRNAs],
-                              numModules = 5,
-                              numIterations = 30)
+# ==== 3.1 Learn the variable DAG
+pdag <- pc(list(C = cor(cancer_dm), 
+                n = nrow(cancer_dm)),
+           indepTest = gaussCItest,
+           alpha = 0.05,
+           p = ncol(cancer_dm))
 
-epi_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
-                              rawData = cancer_dm[, epithelial],
-                              numModules = 4,
-                              numIterations = 30)
+saveRDS(pdag, config$output$variable_dag)
 
-mes_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar', 
-                              rawData = cancer_dm[, mesenchymal],
-                              numModules = 6,
-                              numIterations = 30)
+learned_dag <- pdag2dag(pdag@graph)
+learned_dag <- as(learned_dag$graph, "graphNEL")
 
-# Save results
-save(miRNAs_groups, file=config$output$miRNAgroups)
-save(epi_groups, file=config$output$epigroups)
-save(mes_groups, file=config$output$mesgroups)
+# ==== 3.1 Learn the group DAG skeleton
+groups <- c(
+  convert_to_col_numbers(list(miRNAs_groups[[1]]), cancer_dm),
+  convert_to_col_numbers(list(miRNAs_groups[[4]]), cancer_dm),
+  convert_to_col_numbers(list(epi_groups[[5]]), cancer_dm),
+  convert_to_col_numbers(list(mes_groups[[4]]), cancer_dm)
+)
+groupDAG <- learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  ratio = 0.01,
+  p = length(groups),
+  numCores = -1,
+  verbose = T
+)
+
+saveRDS(groupDAG, config$output$group_dag)
+
+plot(groupDAG)
+
+bnGroupDAG <- bn_learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  p = length(groups),
+  verbose = T
+)
+
+saveRDS(bnGroupDAG, config$output$bn_group_dag)
+
+plot(bnGroupDAG)
+
+groupDAGExp <- learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  ratio = 0.90,
+  p = length(groups),
+  numCores = -1,
+  verbose = T
+)
+
+saveRDS(groupDAGExp, config$output$group_dag_exp)
+
+plot(groupDAGExp)
 ```
 
-# Step 3: Learning group DAG
-```{r include=F}
+```{r}
+cancer_dm <- cancer.miRNAs[, unlist(miRNAs_groups)]
 
 # ==== 3.1 Learn the variable DAG
 pdag <- pc(list(C = cor(cancer_dm), 
@@ -178,66 +208,49 @@ pdag <- pc(list(C = cor(cancer_dm),
            alpha = 0.05,
            p = ncol(cancer_dm))
 
-# pdag <- readRDS('./Results/variable_dag.rds')
+saveRDS(pdag, config$output$miRNA_variable_dag)
 
 learned_dag <- pdag2dag(pdag@graph)
 learned_dag <- as(learned_dag$graph, "graphNEL")
 
-# foreach
-nCores <- detectCores()
-cl <- makeCluster(nCores - 1)
-registerDoParallel(cl)
-
 # ==== 3.1 Learn the group DAG skeleton
-# source('./Scripts/learn_group_skeleton_pc.R')
-# source('./Scripts/conditional_independence_group_test.R')
 groups <- c(
-    convert_to_col_numbers(miRNAs_groups, cancer_dm),
-    convert_to_col_numbers(epi_groups, cancer_dm),
-    convert_to_col_numbers(mes_groups, cancer_dm)
-  )
-# 11:22 AM
+  convert_to_col_numbers(miRNAs_groups, cancer_dm)
+)
 groupDAG <- learn_skeleton_group_pc(
   dag = learned_dag,
   groups =  groups,
-  ratio = 0.90,
+  ratio = 0.01,
+  p = length(groups),
+  numCores = -1,
+  verbose = T
+)
+
+saveRDS(groupDAG, config$output$miRNA_group_dag)
+
+plot(groupDAG)
+
+bnGroupDAG <- bn_learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
   p = length(groups),
   verbose = T
 )
 
-# groupDAG <- readRDS('./Results/group_dag.rds')
-# saveRDS(groupDAG, './Results/group_dag.rds')
+saveRDS(bnGroupDAG, config$output$miRNA_bn_group_dag)
 
-plot(groupDAG)
+plot(bnGroupDAG)
+
+groupDAGExp <- learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  ratio = 0.90,
+  p = length(groups),
+  numCores = -1,
+  verbose = T
+)
+
+saveRDS(groupDAGExp, config$output$miRNA_group_dag_exp)
+
+plot(groupDAGExp)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

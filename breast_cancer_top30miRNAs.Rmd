@@ -26,7 +26,7 @@ Sys.setenv(JAVA_HOME=config$env$JAVA_HOME)
 require.packages(c(
   "rJava", "jdx",
   "foreach", "doParallel",
-  "dplyr", "magrittr",
+  "tidyverse", "dplyr", "magrittr",
   "BiocManager"
 ))
 
@@ -191,6 +191,24 @@ mes_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/modul
 save(miRNAs_groups, file=config$output$miRNAgroups)
 save(epi_groups, file=config$output$epigroups)
 save(mes_groups, file=config$output$mesgroups)
+
+readable <- map_dfr(miRNAs_groups, ~as.data.frame(t(.)))
+write.csv(t(readable), 
+          file=config$output$miRNAgroupsReadable, 
+          col.names = F,
+          row.names = F)
+
+readable <- map_dfr(epi_groups, ~as.data.frame(t(.)))
+write.csv(t(readable), 
+          file=config$output$epigroupsReadable, 
+          col.names = F,
+          row.names = F)
+
+readable <- map_dfr(mes_groups, ~as.data.frame(t(.)))
+write.csv(t(readable), 
+          file=config$output$mesgroupsReadable, 
+          col.names = F,
+          row.names = F)
 ```
 
 # Step 3: Learning group DAG
@@ -203,18 +221,11 @@ pdag <- pc(list(C = cor(cancer_dm),
            p = ncol(cancer_dm))
 
 saveRDS(pdag, config$output$variable_dag)
-# pdag <- readRDS('./Results/variable_dag.rds')
-
-load(file=config$output$miRNAgroups)
-load(file=config$output$epigroups)
-load(file=config$output$mesgroups)
 
 learned_dag <- pdag2dag(pdag@graph)
 learned_dag <- as(learned_dag$graph, "graphNEL")
 
 # ==== 3.1 Learn the group DAG skeleton
-# source('./Scripts/learn_group_skeleton_pc.R')
-# source('./Scripts/conditional_independence_group_test.R')
 groups <- c(
     convert_to_col_numbers(miRNAs_groups, cancer_dm),
     convert_to_col_numbers(epi_groups, cancer_dm),
@@ -230,7 +241,6 @@ groupDAG <- learn_skeleton_group_pc(
   verbose = T
 )
 
-# groupDAG <- readRDS('./Results/group_dag.rds')
 saveRDS(groupDAG, config$output$group_dag)
 
 plot(groupDAG)
