@@ -14,7 +14,7 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
 source("./Scripts/require_packages.R")
 
-require.packages(c("ini", 'readxl', 'dplyr'))
+require.packages(c("ini", 'readxl', 'openxlsx', 'dplyr'))
 
 # Read config file
 config <- read.ini('./Configs/miRNA-target.ini')
@@ -46,10 +46,13 @@ tarbase %>%
 ```
 
 ```{r}
-validate_miRNA_interaction <- function(groupDAG, groupA, groupB, groupB_start, database) {
+validate_miRNA_interaction <- function(groupDAG, groupA, groupB, groupB_start, database, savePath) {
   groupA_len <- length(groupA)
   groupB_len <- length(groupB)
   results <- list()
+  
+  wb <- createWorkbook()
+  
   for (group in 1:groupA_len) {
     if (length(groupDAG@graph@edgeL[[group]]) > 0) {
       edges <- unlist(groupDAG@graph@edgeL[[group]])
@@ -57,16 +60,25 @@ validate_miRNA_interaction <- function(groupDAG, groupA, groupB, groupB_start, d
         if (length(edge) > 0 &&
             edge > groupB_start &&
             edge <= (groupB_start + groupB_len)) {
-          print(paste("Group A: ", group, " - Group B: ", edge))
+          sheetName <- paste("miRNA", group, "_", "Target", edge)
+          print(sheetName)
+          
           database  %>%
             rowwise() %>%
             dplyr::filter((miRNA %in% groupA[[group]]) &
                             (`Target Gene` %in% groupB[[edge - groupB_start]])) -> result
           results[[length(results) + 1]] <- result
+          
+          
+          addWorksheet(wb, sheetName)
+          writeData(wb, sheetName, as.matrix(result))
         }
       }
     }
   }
+  
+  saveWorkbook(wb, savePath, overwrite = T)
+  
   return(results)
 }
 ```
@@ -77,17 +89,18 @@ groupDAG <- readRDS(config$breast_cancer$top30miRNAGroupDag)
 
 miRNAs_group_len <- length(miRNAs_groups)
 epi_group_len <- length(epi_groups)
+mes_group_len <- length(mes_groups)
 
-miRNA_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, epi_groups, 5, tarbase)
+miRNA_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, epi_groups, 5, tarbase, config$output$bcMiRNAEpiTarbase)
 miRNA_epi_interaction_tarbase
 
-miRNA_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, epi_groups, 5, miRTarbase)
+miRNA_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, epi_groups, 5, miRTarbase, config$output$bcMiRNAEpiMirTarbase)
 miRNA_epi_interaction_miRTarbase
 
-miRNA_mes_interaction_tarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, mes_groups, 10, tarbase)
+miRNA_mes_interaction_tarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, mes_groups, 10, tarbase, config$output$bcMiRNAMesTarbase)
 miRNA_mes_interaction_tarbase
 
-miRNA_mes_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, mes_groups, 10, miRTarbase)
+miRNA_mes_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, mes_groups, 10, miRTarbase, config$output$bcMiRNAMesMirTarbase)
 miRNA_mes_interaction_miRTarbase
 ```
 
@@ -98,11 +111,17 @@ groupDAG <- readRDS(config$breast_cancer$epiMarkerGroupDag)
 epi_marker_group_len <- length(epi_marker_groups)
 epi_group_len <- length(epi_groups)
 
-epi_markers_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, epi_marker_groups, epi_groups, 7, tarbase)
+epi_markers_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, epi_marker_groups, epi_groups, 7, tarbase, config$output$bcEpiMarkerEpiTarbase)
 epi_markers_epi_interaction_tarbase
 
-miRNA_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, epi_marker_groups, epi_groups, 7, miRTarbase)
-miRNA_epi_interaction_miRTarbase
+epi_marker_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, epi_marker_groups, epi_groups, 7, miRTarbase, config$output$bcEpiMarkerEpiMirTarbase)
+epi_marker_epi_interaction_miRTarbase
+
+epi_markers_mes_interaction_tarbase <- validate_miRNA_interaction(groupDAG, epi_marker_groups, mes_groups, 12, tarbase, config$output$bcEpiMarkerMesTarbase)
+epi_markers_mes_interaction_tarbase
+
+epi_marker_mes_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, epi_marker_groups, mes_groups, 12, miRTarbase, config$output$bcEpiMarkerMesMirTarbase)
+epi_marker_mes_interaction_miRTarbase
 ```
 
 ```{r}
@@ -111,16 +130,16 @@ groupDAG <- readRDS(config$breast_cancer$mesMarkerGroupDag)
 
 mes_marker_group_len <- length(mes_marker_groups)
 
-mes_marker_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, epi_groups, 2, tarbase)
+mes_marker_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, epi_groups, 2, tarbase, config$output$bcMesMarkerEpiTarbase)
 mes_marker_epi_interaction_tarbase
 
-mes_marker_mes_interaction_tarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, mes_groups, 7, tarbase)
-mes_marker_mes_interaction_tarbase
-
-mes_marker_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, epi_groups, 2, miRTarbase)
+mes_marker_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, epi_groups, 2, miRTarbase, config$output$bcMesMarkerEpiMirTarbase)
 mes_marker_epi_interaction_miRTarbase
 
-mes_marker_mes_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, mes_groups, 7, miRTarbase)
+mes_marker_mes_interaction_tarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, mes_groups, 7, tarbase, config$output$bcMesMarkerMesTarbase)
+mes_marker_mes_interaction_tarbase
+
+mes_marker_mes_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, mes_groups, 7, miRTarbase, config$output$bcMesMarkerMesMirTarbase)
 mes_marker_mes_interaction_miRTarbase
 ```
 
@@ -138,16 +157,16 @@ groupDAG <- readRDS(config$lung_cancer$top30miRNAGroupDag)
 miRNAs_group_len <- length(miRNAs_groups)
 epi_group_len <- length(epi_groups)
 
-miRNA_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, epi_groups, 5, tarbase)
+miRNA_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, epi_groups, 5, tarbase, config$output$lcMiRNAEpiTarbase)
 miRNA_epi_interaction_tarbase
 
-miRNA_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, epi_groups, 5, miRTarbase)
+miRNA_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, epi_groups, 5, miRTarbase, config$output$lcMiRNAEpiMirTarbase)
 miRNA_epi_interaction_miRTarbase
 
-miRNA_mes_interaction_tarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, mes_groups, 10, tarbase)
+miRNA_mes_interaction_tarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, mes_groups, 10, tarbase, config$output$lcMiRNAMesTarbase)
 miRNA_mes_interaction_tarbase
 
-miRNA_mes_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, mes_groups, 10, miRTarbase)
+miRNA_mes_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, miRNAs_groups, mes_groups, 10, miRTarbase, config$output$lcMiRNAMesMirTarbase)
 miRNA_mes_interaction_miRTarbase
 ```
 
@@ -158,11 +177,17 @@ groupDAG <- readRDS(config$lung_cancer$epiMarkerGroupDag)
 epi_marker_group_len <- length(epi_marker_groups)
 epi_group_len <- length(epi_groups)
 
-epi_markers_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, epi_marker_groups, epi_groups, 8, tarbase)
+epi_markers_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, epi_marker_groups, epi_groups, 8, tarbase, config$output$lcEpiMarkerEpiTarbase)
 epi_markers_epi_interaction_tarbase
 
-miRNA_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, epi_marker_groups, epi_groups, 8, miRTarbase)
-miRNA_epi_interaction_miRTarbase
+epi_marker_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, epi_marker_groups, epi_groups, 8, miRTarbase, config$output$lcEpiMarkerEpiMirTarbase)
+epi_marker_epi_interaction_miRTarbase
+
+epi_markers_mes_interaction_tarbase <- validate_miRNA_interaction(groupDAG, epi_marker_groups, mes_groups, 13, tarbase, config$output$lcEpiMarkerMesTarbase)
+epi_markers_mes_interaction_tarbase
+
+epi_marker_mes_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, epi_marker_groups, mes_groups, 13, miRTarbase, config$output$lcEpiMarkerMesMirTarbase)
+epi_marker_mes_interaction_miRTarbase
 ```
 
 
@@ -172,15 +197,15 @@ groupDAG <- readRDS(config$lung_cancer$mesMarkerGroupDag)
 
 mes_marker_group_len <- length(mes_marker_groups)
 
-mes_marker_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, epi_groups, 3, tarbase)
+mes_marker_epi_interaction_tarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, epi_groups, 3, tarbase, config$output$lcMesMarkerEpiTarbase)
 mes_marker_epi_interaction_tarbase
 
-mes_marker_mes_interaction_tarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, mes_groups, 8, tarbase)
-mes_marker_mes_interaction_tarbase
-
-mes_marker_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, epi_groups, 3, miRTarbase)
+mes_marker_epi_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, epi_groups, 3, miRTarbase, config$output$lcMesMarkerEpiMirTarbase)
 mes_marker_epi_interaction_miRTarbase
 
-mes_marker_mes_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, mes_groups, 8, miRTarbase)
+mes_marker_mes_interaction_tarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, mes_groups, 8, tarbase, config$output$lcMesMarkerMesTarbase)
+mes_marker_mes_interaction_tarbase
+
+mes_marker_mes_interaction_miRTarbase <- validate_miRNA_interaction(groupDAG, mes_marker_groups, mes_groups, 8, miRTarbase, config$output$lcMesMarkerMesMirTarbase)
 mes_marker_mes_interaction_miRTarbase
 ```
