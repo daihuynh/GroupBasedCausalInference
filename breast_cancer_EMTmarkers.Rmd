@@ -240,7 +240,7 @@ mes_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwor
 # ==== 2.3 Grouping top 30 miRNAs using Module Network =====
 both_marker_groups <- grouping_using_module_network(jarPath = './Lib/modulenetwork/module.jar',
                               rawData = cancer.miRNAs[, both_markers],
-                              numModules = 1,
+                              numModules = 2,
                               numIterations = 30)
 
 # Save results
@@ -340,7 +340,7 @@ saveRDS(groupDAG, config$output$mesMarkersGroupDag)
 ```
 
 ```{r, include=F}
-# ==== 3.3.1 Mes Marker data matrix for the experiment ====
+# ==== 3.3.1 Both Marker data matrix for the experiment ====
 cancer_dm <- cbind(cancer.miRNAs[, both_markers], 
                    cancer.mRNAs[, epithelial], 
                    cancer.mRNAs[, mesenchymal])
@@ -379,7 +379,47 @@ groupDAG <- learn_skeleton_group_pc(
 saveRDS(groupDAG, config$output$bothMarkersGroupDag)
 ```
 
+```{r, include=F}
+# ==== 3.4.1 All Marker data matrix for the experiment ====
+cancer_dm <- cbind(cancer.miRNAs[, epi_marker_groups], 
+                   cancer.miRNAs[, mes_marker_groups],
+                   cancer.miRNAs[, both_markers], 
+                   cancer.mRNAs[, epithelial], 
+                   cancer.mRNAs[, mesenchymal])
 
+# ==== 3.4.2 Learn the variable DAG ====
+pdag <- pc(list(C = cor(cancer_dm), 
+                n = nrow(cancer_dm)),
+           indepTest = gaussCItest,
+           alpha = 0.05,
+           p = ncol(cancer_dm))
+
+saveRDS(pdag, config$output$allMarkersVariableDag)
+
+learned_dag <- pdag2dag(pdag@graph)
+learned_dag <- as(learned_dag$graph, "graphNEL")
+
+# ==== 3.4.3 Learn the group DAG skeleton ====
+groups <- c(
+    convert_to_col_numbers(epi_marker_groups, cancer_dm),
+    convert_to_col_numbers(mes_marker_groups, cancer_dm),
+    convert_to_col_numbers(both_marker_groups, cancer_dm),
+    convert_to_col_numbers(epi_groups, cancer_dm),
+    convert_to_col_numbers(mes_groups, cancer_dm)
+  )
+
+# 07:25 AM
+groupDAG <- learn_skeleton_group_pc(
+  dag = learned_dag,
+  groups =  groups,
+  ratio = 0.90,
+  p = length(groups),
+  numCores = 10,
+  verbose = T
+)
+
+saveRDS(groupDAG, config$output$allMarkersGroupDag)
+```
 
 
 
